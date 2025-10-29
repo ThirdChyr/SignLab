@@ -1,77 +1,94 @@
 "use client"
-import { useState,useEffect } from "react";
-import "./../css/profile.css"; 
+import { useState, useEffect } from "react";
+import "./../css/profile.css";
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import axios from '../axios';
 
 
 export default function Profile() {
-  const [editMode, setEditMode] = useState(false);
-  const [profile, setProfile] = useState({
-    username: "",
-    name: "",
-    surname: "",
-    tel: "",
-    sex: "",
-    birthday: "",
-    email: "",
-    password:"******"
-  });
+    const [editMode, setEditMode] = useState(false);
+    const [profile, setProfile] = useState({
+        username: "",
+        name: "",
+        surname: "",
+        tel: "",
+        sex: "",
+        birthday: "",
+        email: "",
+        password: "******"
+    });
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const res = await axios.get("/getdata");
-        if (res.data.success) {
-          const user = res.data.user;
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            try {
+                const res = await axios.get("/getdata");
+                if (res.data.success) {
+                    const user = res.data.user;
 
-          
-          const birthday = new Date(user.birthday).toISOString().split("T")[0];
 
-          setProfile({
-            username: user.username,
-            name: user.name,
-            surname: user.surname,
-            tel: user.tel,
-            sex: user.sex,
-            birthday,
-            email: user.email,
-            password :"*******"
-          });
-        }
-      } catch (err) {
-        console.error("Error loading profile:", err);
-      }
+                    const birthday = new Date(user.birthday).toISOString().split("T")[0];
+
+                    setProfile({
+                        username: user.username,
+                        name: user.name,
+                        surname: user.surname,
+                        tel: user.tel,
+                        sex: user.sex,
+                        birthday,
+                        email: user.email,
+                        password: "*******"
+                    });
+                }
+            } catch (err) {
+                console.error("Error loading profile:", err);
+            }
+        };
+
+        fetchUserProfile();
+    }, []);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        setProfile({ ...profile, [e.target.name]: e.target.value });
     };
 
-    fetchUserProfile();
-  }, []);
+    const handleEdit = () => setEditMode(true);
+const handleSave = async () => {
+  try {
+    // คัดลอกข้อมูล profile
+    const dataToSend = { ...profile };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setProfile({ ...profile, [e.target.name]: e.target.value });
-  };
-
-  const handleEdit = () => setEditMode(true);
-  const handleSave = async () => {
-    try {
-      const res = await axios.put("/user/profile", profile);
-      if (res.data.success) {
-        setEditMode(false);
-      
-      }
-    } catch (err) {
-      console.error("Error saving profile:", err);
+    // ถ้า password ยังเป็น "*******" แปลว่ายังไม่ได้แก้ไข → ไม่ต้องส่งไป
+    if (dataToSend.password === "*******") {
+      delete dataToSend.password;
     }
-  };
+
+    const res = await axios.put("/updateprofile", dataToSend);
+
+    if (res.data.success) {
+      alert("บันทึกข้อมูลเรียบร้อยแล้ว!");
+      setEditMode(false);
+
+      // reset password field เป็น "*******" หลังบันทึก
+      setProfile(prev => ({ ...prev, password: "*******" }));
+
+    } else {
+      alert("อัปเดตไม่สำเร็จ");
+    }
+  } catch (err) {
+    console.error("Error saving profile:", err);
+    alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+  }
+};
+
 
     return (
         <div className="profileContainer">
             <div className="profileAvatar">
                 <div className="profileAvatarCircle">
                     <svg width="90" height="90" fill="#fff">
-                        <circle cx="45" cy="33" r="22"/>
-                        <ellipse cx="45" cy="70" rx="36" ry="22"/>
+                        <circle cx="45" cy="33" r="22" />
+                        <ellipse cx="45" cy="70" rx="36" ry="22" />
                     </svg>
                 </div>
             </div>
@@ -87,7 +104,7 @@ export default function Profile() {
                 <div className="profileInputGroup">
                     <input
                         type="text"
-                        name="firstname"
+                        name="name"  // เดิม firstname
                         value={profile.name}
                         onChange={handleChange}
                         disabled={!editMode}
@@ -95,7 +112,7 @@ export default function Profile() {
                     />
                     <input
                         type="text"
-                        name="lastname"
+                        name="surname"  // เดิม lastname
                         value={profile.surname}
                         onChange={handleChange}
                         disabled={!editMode}
@@ -106,15 +123,15 @@ export default function Profile() {
                     {editMode ? (
                         <>
                             <select
-                                name="gender"
+                                name="sex" // เดิม gender
                                 value={profile.sex}
                                 onChange={handleChange}
                                 className="profileInput editable"
                                 style={{ color: profile.sex ? "#333333" : "#888", fontFamily: 'Kanit' }}
                             >
-                                <option value="ชาย">ชาย</option>
-                                <option value="หญิง">หญิง</option>
-                                <option value="อื่นๆ">อื่นๆ</option>
+                                <option value="male">ชาย</option>
+                                <option value="female">หญิง</option>
+                                <option value="other">อื่นๆ</option>
                             </select>
                             <ReactDatePicker
                                 selected={profile.birthday ? new Date(profile.birthday) : null}
@@ -175,13 +192,13 @@ export default function Profile() {
                     disabled={!editMode}
                     className={`profileInput${editMode ? " editable" : ""}`}
                 />
-                {/* <button
+                <button
                     type="button"
                     onClick={editMode ? handleSave : handleEdit}
                     className="profileButton"
                 >
                     {editMode ? "บันทึก" : "แก้ไข"}
-                </button> */}
+                </button>
             </form>
         </div>
     );
