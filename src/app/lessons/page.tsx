@@ -36,7 +36,7 @@ export default function Lessons() {
                     // ← เพิ่ม delay ก่อน redirect
                     setTimeout(() => {
                         router.push("/login");
-                    }, 2000);
+                    }, 10000);
                     return;
                 }
 
@@ -72,7 +72,7 @@ export default function Lessons() {
                     // ← เพิ่ม delay ก่อน redirect
                     setTimeout(() => {
                         router.push("/login");
-                    }, 2000);
+                    }, 10000);
                 } else {
                     // ใช้ค่าเริ่มต้น
                     setUserName("ผู้ใช้");
@@ -97,7 +97,7 @@ export default function Lessons() {
             // ← delay ก่อน redirect
             setTimeout(() => {
                 router.push("/login");
-            }, 2000);
+            }, 10000);
         }
     }, [loading, isAuthenticated, router]);
 
