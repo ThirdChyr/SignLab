@@ -6,17 +6,17 @@ import { useState } from "react";
 const greetData = [
   { id: 1, question:"ฉัน", video: "/chapter/stage1/01.mp4" },
   { id: 2, question: "ขอโทษ", video: "/chapter/stage1/02.mp4" },
-  { id: 3, question: "สวัสดี", video: "/chapter/stage1/03.mp4" },
-  { id: 4, question: "แนะนำ", video: "/chapter/stage1/04.mp4" },
-  { id: 5, question: "พบ(คนหนึ่งและอีกคนหนึ่งพบกัน)", video: "/chapter/stage1/05.mp4" },
-  { id: 6, question: "พบ(คุณพบกับฉัน)", video: "/chapter/stage1/06.mp4" },
-  { id: 7, question: "ชื่อภาษามือ", video: "/chapter/stage1/07.mp4" },
-  { id: 8, question: "ไม่เป็นไร", video: "/chapter/stage1/08.mp4" },
-  { id: 9, question: "ไม่สบาย", video: "/chapter/stage1/09.mp4" },
-  { id: 10, question: "ใช่", video: "/chapter/stage1/10.mp4" },
-  { id: 11, question: "ไม่ใช่", video: "/chapter/stage1/11.mp4" },
-  { id:12, question: "ขอบคุณ", video: "/chapter/stage1/12.mp4" },
-  { id: 13, question: "สบายดี", video: "/chapter/stage1/13.mp4" },
+  { id: 3, question: "ขอบคุณ", video: "/chapter/stage1/03.mp4" },
+  { id: 4, question: "สวัสดี", video: "/chapter/stage1/04.mp4" },
+  { id: 5, question: "แนะนำ", video: "/chapter/stage1/05.mp4" },
+  { id: 6, question: "สบายดี", video: "/chapter/stage1/06.mp4" },
+  { id: 7, question: "พบ (คนหนึ่งและอีกคนหนึ่งพบกัน)", video: "/chapter/stage1/07.mp4" },
+  { id: 8, question: "พบ (คุณพบกับฉัน)", video: "/chapter/stage1/08.mp4" },
+  { id: 9, question: "ชื่อภาษามือ", video: "/chapter/stage1/09.mp4" },
+  { id: 10, question: "ไม่เป็นไร", video: "/chapter/stage1/10.mp4" },
+  { id: 11, question: "ไม่สบาย", video: "/chapter/stage1/11.mp4" },
+  { id:12, question: "ใช่", video: "/chapter/stage1/12.mp4" },
+  { id: 13, question: "ไม่ใช่", video: "/chapter/stage1/13.mp4" },
 ];
 
 // Stage 2: ตัวเลข (image)
