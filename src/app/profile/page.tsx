@@ -132,7 +132,7 @@ export default function Profile() {
                         sex: user.sex || "",
                         birthday,
                         email: user.email || "",
-                        password: "*******"
+                        password: user.password || "*******",
                     });
                 }
             } catch (err: any) {
