@@ -2,6 +2,7 @@
 import { AiOutlineLeft } from "react-icons/ai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {DatePicker} from "@heroui/date-picker";
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
@@ -25,18 +26,15 @@ export default function Register() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [birthday, setDob] = useState<Date | null>(null);
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setForm({ ...form, [e.target.name]: e.target.value });
     };
-
      const handleCheckUser = async () => {
   try {
     const res = await axios.post("/check-user", {
       username: form.username,
       email: form.email
     });
-
     return res.data.success === true;
   } catch (err: any) {
     if (err.response?.status === 409) {
@@ -50,12 +48,6 @@ export default function Register() {
   }
 };
 
-
-
-
-
-
-
    const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
         
@@ -63,77 +55,59 @@ export default function Register() {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณากรอกชื่อผู้ใช้");
             return;
         }
-        
         if (!form.firstname.trim()) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณากรอกชื่อ");
             return;
         }
-        
         if (!form.lastname.trim()) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณากรอกนามสกุล");
             return;
         }
-        
         if (!form.sex) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณาเลือกเพศ");
             return;
         }
-        
         if (!form.birthday || !birthday) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณาเลือกวันเกิด");
             return;
         }
-        
         if (!form.email.trim()) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณากรอกอีเมล");
             return;
         }
-        
-        // ตรวจสอบรูปแบบอีเมล
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(form.email)) {
             showErrorPopup("รูปแบบอีเมลไม่ถูกต้อง", "กรุณากรอกอีเมลให้ถูกต้อง");
             return;
         }
-        
         if (!form.password) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณากรอกรหัสผ่าน");
             return;
         }
-        
         if (form.password.length < 6) {
             showErrorPopup("รหัสผ่านไม่ถูกต้อง", "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
             return;
         }
-        
         if (!form.confirmPassword) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณายืนยันรหัสผ่าน");
             return;
         }
-        
         if (form.password !== form.confirmPassword) {
             showErrorPopup("รหัสผ่านไม่ตรงกัน", "กรุณากรอกรหัสผ่านและยืนยันรหัสผ่านให้ตรงกัน");
             return;
         }
-         
          const valid = await handleCheckUser();
           if (!valid) return;
         // ถ้าผ่านการตรวจสอบทั้งหมดแล้ว
         showLoadingPopup("กำลังส่ง OTP", "กรุณารอสักครู่...");
-        
          try {
-    
     const otpRes =  await  axios.post("send-otp", {
       email: form.email,
         purpose: "register"
-      
     });
-
     if (otpRes.data.success) {
       removeExistingPopup();
-
       showSuccessPopup("ส่งรหัส OTP สำเร็จ", "กรุณาตรวจสอบอีเมลของคุณ", () => {
-      
         const registrationData = encodeURIComponent(JSON.stringify({
           username: form.username,
           name: form.firstname,
@@ -142,9 +116,8 @@ export default function Register() {
           birthday: form.birthday,
           email: form.email,
           password: form.password,
-          tel: form.tel //form.tel <--- ใส่เบอร์โทรจริงถ้ามี input field
+          tel: form.tel
         }));
-
         router.push(`/otp?type=register&data=${registrationData}`);
       });
     } else {
@@ -157,7 +130,6 @@ export default function Register() {
     showErrorPopup("เกิดข้อผิดพลาด", "ไม่สามารถส่งรหัส OTP ได้");
   }
 };
-
     return (
         <main>
             <div className="login_container_top">
@@ -203,17 +175,17 @@ export default function Register() {
                             <div style={{ display: "flex", gap: "20px" }}>
                                 <select
                                     name="sex"
-                                    className="input_button"
+                                    className="input_button dropdown_only"
                                     value={form.sex}
                                     onChange={handleChange}
-                                    style={{ flex: 1, minWidth: 0 }}
+                                    id ="dropdown"
                                 >
                                     <option value="" disabled hidden>เพศ</option>
-                                    <option value="female">หญิง</option>
+                                    <option value="female" >หญิง</option>
                                     <option value="male">ชาย</option>
                                     <option value="other">ไม่ระบุ</option>
                                 </select>
-                                <div style={{ flex: 1, minWidth: 0 ,width: "100%" }}>
+                                <div className="datepicker_container" style={{ }}>
                                     <ReactDatePicker
                                         selected={birthday}
                                         onChange={(date) => {
@@ -222,7 +194,7 @@ export default function Register() {
                                         }}
                                         dateFormat="dd / MM / yyyy"
                                         placeholderText="วัน / เดือน / ปี เกิด"
-                                        className="input_button only_calendar"
+                                        className="input_button "
                                         maxDate={new Date()}
                                         showMonthDropdown
                                         showYearDropdown
