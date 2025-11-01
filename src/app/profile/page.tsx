@@ -25,10 +25,7 @@ export default function Profile() {
                 const res = await axios.get("/getdata");
                 if (res.data.success) {
                     const user = res.data.user;
-
-
                     const birthday = new Date(user.birthday).toISOString().split("T")[0];
-
                     setProfile({
                         username: user.username,
                         name: user.name,
@@ -80,8 +77,6 @@ const handleSave = async () => {
     alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
   }
 };
-
-
     return (
         <div className="profileContainer">
             <div className="profileAvatar">
@@ -92,74 +87,84 @@ const handleSave = async () => {
                     </svg>
                 </div>
             </div>
-            <form className="profileForm">
+            <form className="profileForm" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 <input
                     type="text"
                     name="username"
+                    placeholder="ชื่อผู้ใช้"
                     value={profile.username}
                     onChange={handleChange}
                     disabled={!editMode}
-                    className={`profileInput profileInputLarge${editMode ? " editable" : ""}`}
+                    className={`input_button${editMode ? " editable" : ""}`}
+                    style={{ width: "100%" }}
                 />
-                <div className="profileInputGroup">
+                <div style={{ display: "flex", gap: "20px" }}>
                     <input
                         type="text"
-                        name="name"  // เดิม firstname
+                        name="name"
+                        placeholder="ชื่อ"
                         value={profile.name}
                         onChange={handleChange}
                         disabled={!editMode}
-                        className={`profileInput${editMode ? " editable" : ""}`}
+                        className={`input_button${editMode ? " editable" : ""}`}
+                        style={{ flex: 1, minWidth: 0 }}
                     />
                     <input
                         type="text"
-                        name="surname"  // เดิม lastname
+                        name="surname"
+                        placeholder="นามสกุล"
                         value={profile.surname}
                         onChange={handleChange}
                         disabled={!editMode}
-                        className={`profileInput${editMode ? " editable" : ""}`}
+                        className={`input_button${editMode ? " editable" : ""}`}
+                        style={{ flex: 1, minWidth: 0 }}
                     />
                 </div>
-                <div className="profileInputGroup">
+
+                <div style={{ display: "flex", gap: "20px" }}>
                     {editMode ? (
                         <>
                             <select
-                                name="sex" // เดิม gender
+                                name="sex"
+                                className="input_button dropdown_only editable"
                                 value={profile.sex}
                                 onChange={handleChange}
-                                className="profileInput editable"
-                                style={{ color: profile.sex ? "#333333" : "#888", fontFamily: 'Kanit' }}
+                                style={{ flex: 1, minWidth: 0 }}
                             >
-                                <option value="male">ชาย</option>
+                                <option value="" disabled hidden>เพศ</option>
                                 <option value="female">หญิง</option>
-                                <option value="other">อื่นๆ</option>
+                                <option value="male">ชาย</option>
+                                <option value="other">ไม่ระบุ</option>
                             </select>
-                            <ReactDatePicker
-                                selected={profile.birthday ? new Date(profile.birthday) : null}
-                                onChange={date =>
-                                    setProfile({ ...profile, birthday: date ? date.toISOString().slice(0, 10) : "" })
-                                }
-                                dateFormat="dd/MM/yyyy"
-                                className="profileInput editable"
-                                wrapperClassName="profileInputDateWrapper"
-                                placeholderText="เลือกวันเกิด"
-                                showMonthDropdown
-                                showYearDropdown
-                                dropdownMode="select"
+                            <div className="datepicker_container" style={{ flex: 1, minWidth: 0 }}>
+                                <ReactDatePicker
+                                    selected={profile.birthday ? new Date(profile.birthday) : null}
+                                    onChange={(date) => setProfile({ ...profile, birthday: date ? date.toISOString().split("T")[0] : "" })}
+                                    dateFormat="dd / MM / yyyy"
+                                    placeholderText="วัน / เดือน / ปี เกิด"
+                                    className="input_button"
+                                    maxDate={new Date()}
+                                    showMonthDropdown
+                                    showYearDropdown
+                                    dropdownMode="select"
                             />
+                            </div>
                         </>
                     ) : (
                         <>
                             <input
                                 type="text"
-                                name="gender"
-                                value={profile.sex}
+                                name="sex"
+                                placeholder="เพศ"
+                                value={profile.sex === "male" ? "ชาย" : profile.sex === "female" ? "หญิง" : "ไม่ระบุ"}
                                 disabled
-                                className="profileInput"
-                                style={{ color: "#333333" }}
+                                className="input_button"
+                                style={{ flex: 1, minWidth: 0 }}
                             />
                             <input
                                 type="text"
-                                name="dob"
+                                name="birthday"
+                                placeholder="วันเกิด"
                                 value={
                                     profile.birthday
                                         ? new Date(profile.birthday).toLocaleDateString("en-GB", {
@@ -170,35 +175,59 @@ const handleSave = async () => {
                                         : ""
                                 }
                                 disabled
-                                className="profileInput"
-                                style={{ color: "#333333" }}
+                                className="input_button"
+                                style={{ flex: 1, minWidth: 0 }}
                             />
                         </>
                     )}
                 </div>
+
+                {/* อีเมล */}
                 <input
                     type="email"
                     name="email"
+                    placeholder="อีเมล"
                     value={profile.email}
                     onChange={handleChange}
                     disabled={!editMode}
-                    className={`profileInput${editMode ? " editable" : ""}`}
+                    className={`input_button${editMode ? " editable" : ""}`}
+                    style={{ width: "100%" }}
                 />
+
+                <input
+                    type="tel"
+                    name="tel"
+                    placeholder="เบอร์โทร"
+                    value={profile.tel}
+                    onChange={handleChange}
+                    disabled={!editMode}
+                    className={`input_button${editMode ? " editable" : ""}`}
+                    style={{ width: "100%" }}
+                />
+
                 <input
                     type="password"
                     name="password"
+                    placeholder="รหัสผ่าน"
                     value={profile.password}
                     onChange={handleChange}
                     disabled={!editMode}
-                    className={`profileInput${editMode ? " editable" : ""}`}
+                    className={`input_button${editMode ? " editable" : ""}`}
+                    style={{ width: "100%" }}
                 />
-                <button
-                    type="button"
-                    onClick={editMode ? handleSave : handleEdit}
-                    className="profileButton"
-                >
-                    {editMode ? "บันทึก" : "แก้ไข"}
-                </button>
+
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                    <button
+                        type="button"
+                        onClick={editMode ? handleSave : handleEdit}
+                        className="first_button_getstart"
+                        style={{ marginTop: 12 }}
+                    >
+                        <h1 className="font_description_white normal">
+                            {editMode ? "บันทึก" : "แก้ไข"}
+                        </h1>
+                    </button>
+                </div>
             </form>
         </div>
     );
