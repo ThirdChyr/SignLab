@@ -2,7 +2,8 @@
 import { AiOutlineLeft } from "react-icons/ai";
 import { useRouter } from "next/navigation"; 
 import { useState } from "react";
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import Image from "next/image";
+import { showLoadingPopup, showSuccessPopup, showErrorPopup, removeExistingPopup } from "../components/Popup";
 import "../css/component.css"; 
 import "../css/container.css";
 import axios from '../axios';
@@ -11,7 +12,10 @@ import axios from '../axios';
 interface ApiError {
   response?: {
     status: number;
-    data?: any;
+    data?: {
+      message?: string;
+      [key: string]: unknown;
+    };
   };
   message?: string;
 }
@@ -50,10 +54,10 @@ export default function Login() {
         showErrorPopup("เข้าสู่ระบบล้มเหลว", response.data?.message || "ไม่สามารถเข้าสู่ระบบได้");
       }
 
-    } catch (error) { // แก้ไข: เปลี่ยนชื่อและเพิ่ม type
+    } catch (error) {
       removeExistingPopup();
       
-      const err = error as ApiError; // Type assertion
+      const err = error as ApiError;
       
       if (err.response?.status === 401) {
         showErrorPopup("เข้าสู่ระบบล้มเหลว", "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
@@ -84,7 +88,13 @@ export default function Login() {
 
       <div className="login_container_outer">
         <div className="login_container_inner">
-          <img src={"./picintro.png"} alt="Introduction" />
+          <Image 
+            src="/picintro.png" 
+            alt="Introduction" 
+            width={400}
+            height={300}
+            style={{ objectFit: 'contain' }}
+          />
           <div className="login_container_inner_right">
             <form onSubmit={(e) => e.preventDefault()}>
               <input
@@ -114,7 +124,7 @@ export default function Login() {
                   type="submit"
                   className="first_button_getstart"
                   onClick={handleLogin}
-                  disabled={!username || !password} // เพิ่ม validation
+                  disabled={!username || !password}
                 >
                   <h1 className="font_description_white normal">เข้าสู่ระบบ</h1>
                 </button>
