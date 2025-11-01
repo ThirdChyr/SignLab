@@ -1,36 +1,35 @@
 "use client"
-import React, { useState, useEffect } from 'react';
-import { useParams,useRouter } from 'next/navigation';
-
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { AiOutlineLeft } from 'react-icons/ai';
-import { useNavigation } from '@/app/hooks/useNavigation';
-import { ImCross } from "react-icons/im";
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from '@/app/components/Popup';
+import { showSuccessPopup, showErrorPopup } from '@/app/components/Popup';
 import '@/app/css/component.css';
 import '@/app/css/container.css';
 import '@/app/css/stage.css';
 import axios from "@/app/axios";
 import { jwtDecode } from "jwt-decode";
 
-export default function Stage() {
-    const router = useRouter();
-    const [showGate, setShowGate] = useState(true);
-    const [progress, setProgress] = useState(0);
-    const [progressstage, setProgressstage] = useState(0); 
-    const [currentImageIndex, setCurrentImageIndex] = useState(0); 
-    const [correctAnswer, setCorrectAnswer] = useState(''); // คำตอบที่ถูกต้อง
-    const [currentChoices, setCurrentChoices] = useState<string[]>([]);
-    const [currentRound, setCurrentRound] = useState(1); // รอบปัจจุบัน
-    const [gameQuestions, setGameQuestions] = useState<any[]>([]); // เก็บคำถาม 5 รอบ
-    const [life,setlife] = useState(5); // จำนวนชีวิตเริ่มต้น
+interface QuestionData {
+    id: number;
+    question: string;
+    hint: string;
+    video: string;
+}
 
-    const params = useParams();
-    const stageId = parseInt(params.stageid as string);
-    const chapterNumber = 2; // เปลี่ยนเป็น 2 เพราะเป็น stage2
-    console.log("Chapter:", chapterNumber);
-    console.log("Stage ID:", stageId);
+interface GameQuestion {
+    round: number;
+    correctAnswer: string;
+    hint: string;
+    video: string;
+    choices: string[];
+}
 
-   const questionData = [
+interface JwtPayload {
+    id: string;
+    email: string;
+}
+
+const questionData: QuestionData[] = [
     {
         id: 1,
         question: "ฉัน",
@@ -111,23 +110,31 @@ export default function Stage() {
     },
 ];
 
-    // ฟังก์ชันสร้างตัวเลือก
-    const generateChoices = (correctAnswer: string) => {
+export default function Stage() {
+    const [progress, setProgress] = useState(0);
+    const [progressstage, setProgressstage] = useState(0); 
+    const [correctAnswer, setCorrectAnswer] = useState(''); 
+    const [currentChoices, setCurrentChoices] = useState<string[]>([]);
+    const [currentRound, setCurrentRound] = useState(1); 
+    const [gameQuestions, setGameQuestions] = useState<GameQuestion[]>([]); 
+    const [life, setLife] = useState(5); 
+
+    const params = useParams();
+    const stageId = parseInt(params.stageid as string);
+
+    const generateChoices = useCallback((correctAnswer: string) => {
         const wrongAnswers = questionData
             .filter(item => item.question !== correctAnswer)
             .map(item => item.question);
         
-        // สุ่มเลือก 3 คำตอบผิด
         const shuffledWrong = wrongAnswers.sort(() => Math.random() - 0.5);
         const selectedWrong = shuffledWrong.slice(0, 3);
         
-        // รวมกับคำตอบถูก แล้วสุ่มลำดับ
         const allChoices = [...selectedWrong, correctAnswer];
         return allChoices.sort(() => Math.random() - 0.5);
-    };
+    }, []);
 
-    // สุ่มคำถาม 5 รอบ - เปลี่ยน image เป็น video
-    const generateGameQuestions = () => {
+    const generateGameQuestions = useCallback(() => {
         const shuffledQuestions = [...questionData].sort(() => Math.random() - 0.5);
         const selected5Questions = shuffledQuestions.slice(0, 5);
         
@@ -135,32 +142,28 @@ export default function Stage() {
             round: index + 1,
             correctAnswer: question.question,
             hint: question.hint,
-            video: question.video, // เปลี่ยนจาก image เป็น video
+            video: question.video,
             choices: generateChoices(question.question)
         }));
         
         return gameData;
-    };
+    }, [generateChoices]);
 
-    // เริ่มเกมใหม่
-    const startNewGame = () => {
+    const startNewGame = useCallback(() => {
         const newGameQuestions = generateGameQuestions();
         setGameQuestions(newGameQuestions);
         setCurrentRound(1);
         setProgressstage(0);
-        setlife(5); // รีเซ็ตชีวิต
+        setLife(5);
         
-        // ตั้งค่ารอบแรก
         if (newGameQuestions.length > 0) {
             const firstQuestion = newGameQuestions[0];
             setCorrectAnswer(firstQuestion.correctAnswer);
             setCurrentChoices(firstQuestion.choices);
-            setCurrentImageIndex(0);
         }
-    };
+    }, [generateGameQuestions]);
 
-    // ไปรอบถัดไป
-    const nextRound = () => {
+    const nextRound = useCallback(() => {
         if (currentRound < 5 && currentRound < gameQuestions.length) {
             const nextRoundData = gameQuestions[currentRound];
             setCurrentRound(prev => prev + 1);
@@ -168,7 +171,7 @@ export default function Stage() {
             setCorrectAnswer(nextRoundData.correctAnswer);
             setCurrentChoices(nextRoundData.choices);
         }
-    };
+    }, [currentRound, gameQuestions]);
 
     const checkAnswer = async (selectedAnswer: string) => {
         if (life === 1) {
@@ -183,7 +186,7 @@ export default function Stage() {
             showSuccessPopup(`ถูกต้อง! คำตอบคือ: ${correctAnswer}`);
 
             if (currentRound < 5) {
-                nextRound(); // ไปรอบถัดไป
+                nextRound();
             } else {
                 setProgressstage(prev => prev + 1);
 
@@ -194,18 +197,18 @@ export default function Stage() {
                         return;
                     }
 
-                    const decoded: any = jwtDecode(token);
+                    const decoded = jwtDecode<JwtPayload>(token);
                     const userId = decoded.id;
 
-                    const res = await axios.post("/update-progress", {
+                    const response = await axios.post("/update-progress", {
                         user_id: userId,
                         stage_id: stageId
                     });
 
-                    if (res.data.success) {
+                    if (response.data.success) {
                         console.log("อัปเดต progress สำเร็จ และเพิ่มแต้มแล้ว");
                     } else {
-                        console.warn("ไม่อัปเดต:", res.data.message);
+                        console.warn("ไม่อัปเดต:", response.data.message);
                     }
                 } catch (error) {
                     console.error("เกิดข้อผิดพลาดในการอัปเดต progress:", error);
@@ -219,26 +222,21 @@ export default function Stage() {
             }
         } else {
             showErrorPopup(`ผิด! ยังไม่ถูกต้อง`);
-            setlife(prev => prev - 1); // ลดจำนวนชีวิต
+            setLife(prev => prev - 1);
         }
     };
 
-    const calculateProgress = () => {
+    const calculateProgress = useCallback(() => {
         return (progressstage / 5) * 100;
-    };
+    }, [progressstage]);
 
-    const reset = () => {
-        startNewGame(); // เริ่มเกมใหม่
-    };
-
-    // เริ่มเกมเมื่อโหลดหน้า
     useEffect(() => {
         startNewGame();
-    }, []);
+    }, [startNewGame]);
 
     useEffect(() => {
         setProgress(calculateProgress());
-    }, [progressstage]); 
+    }, [calculateProgress]); 
 
     const currentQuestionData = gameQuestions[currentRound - 1] || gameQuestions[0];
 
@@ -289,31 +287,22 @@ export default function Stage() {
                 alignItems: 'center',
                 gap: '15px'
             }}>
-                {/* แสดงวิดีโอแทนรูป */}
                 {currentQuestionData && (
                     <video
-                        key={currentQuestionData.video} // บังคับให้ reload เมื่อเปลี่ยนวิดีโอ
+                        key={currentQuestionData.video}
                         src={currentQuestionData.video}
-                        width={600}          // ขนาดเท่ากับรูปเดิม
-                        height={350}         // ขนาดเท่ากับรูปเดิม
-                        autoPlay             // เล่นอัตโนมัติ
-                        loop                 // เล่นวนซ้ำ
-                        muted                // ไม่มีเสียง
-                        playsInline          // สำหรับมือถือ
-                        controls={false}     // ไม่แสดงตัวควบคุม
-                        preload="auto"       // โหลดล่วงหน้า
+                        width={600}
+                        height={350}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        controls={false}
+                        preload="auto"
                         style={{ 
                             borderRadius: '10px', 
                             objectFit: 'cover',
-                            backgroundColor: '#000' // พื้นหลังสีดำ
-                        }}
-                        onEnded={() => {
-                            // เล่นใหม่เมื่อจบ
-                            const video = document.querySelector('video') as HTMLVideoElement;
-                            if (video) {
-                                video.currentTime = 0;
-                                video.play();
-                            }
+                            backgroundColor: '#000'
                         }}
                     >
                         <source src={currentQuestionData.video} type="video/mp4" />
@@ -321,14 +310,12 @@ export default function Stage() {
                     </video>
                 )}
 
-                {/* แสดงข้อมูลรอบปัจจุบัน */}
                 <div style={{ textAlign: 'center', color: 'var(--foreground)' }}>
                     <h2>รอบที่ {currentRound} จาก 5</h2>
                     <h3>วิดีโอนี้คือสัญลักษณ์อะไร?</h3>
                     <h4 className='bold font_style' style={{color:"var(--red)"}} >สามารถตอบได้อีก {life}</h4>
                 </div>
 
-                {/* แสดงตัวเลือกของรอบปัจจุบัน */}
                 <div style={{ 
                     display: 'grid', 
                     gridTemplateColumns: '1fr 1fr', 
@@ -355,10 +342,9 @@ export default function Stage() {
                     ))}
                 </div>
 
-                {/* ปุ่มควบคุม */}
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button 
-                        onClick={() => showSuccessPopup(`คำใบ้: ${currentQuestionData.hint}`)}
+                        onClick={() => showSuccessPopup(`คำใบ้: ${currentQuestionData?.hint || ''}`)}
                         style={{
                             padding: '10px 20px',
                             background: 'var(--softorange)',
@@ -368,11 +354,10 @@ export default function Stage() {
                             cursor: 'pointer'
                         }}
                     >
-                        <p className ="font-botton font-style">คำใบ้</p>
+                        <p className="font-botton font-style">คำใบ้</p>
                     </button>
-                    {currentQuestionData && (
-                         <button 
-                        onClick={reset}
+                    <button 
+                        onClick={startNewGame}
                         style={{
                             padding: '10px 20px',
                             background: 'var(--red)',
@@ -382,9 +367,8 @@ export default function Stage() {
                             cursor: 'pointer'
                         }}
                     >
-                        <p className ="font-botton font-style">เริ่มเกมใหม่</p>
+                        <p className="font-botton font-style">เริ่มเกมใหม่</p>
                     </button>
-                    )}
                 </div>
             </div>
         </main>
