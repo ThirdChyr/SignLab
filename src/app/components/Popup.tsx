@@ -2,7 +2,6 @@
 
 // ฟังก์ชันสำหรับแสดง Loading Popup
 export const showLoadingPopup = (title: string = "กำลังโหลด", message: string = "กรุณารอสักครู่...") => {
-    // ลบ popup เก่าถ้ามี
     removeExistingPopup();
     
     const overlay = document.createElement('div');
@@ -94,7 +93,6 @@ export const showSuccessPopup = (title: string = "สำเร็จ!", message:
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
     
-    // Auto remove หลังจาก 1.5 วินาที
     setTimeout(() => {
         removeExistingPopup();
         if (callback) callback();
@@ -150,7 +148,6 @@ export const showErrorPopup = (title: string = "เกิดข้อผิด�
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
     
-    // เพิ่ม event listener สำหรับปุ่ม OK
     const okButton = document.getElementById('error-popup-ok');
     if (okButton) {
         okButton.addEventListener('click', () => {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import '../css/lessons.css';
 
 interface LessonData {
@@ -56,7 +56,6 @@ const LessonGrid = ({
 
     const getCompletedStagesCount = () => {
         const startId = (chapterNumber - 1) * totalStagesInChapter + 1;
-        const endId = startId + totalStagesInChapter - 1;
         return Math.min(
             Math.max(userProgress.lastCompletedStage - startId + 1, 0),
             totalStagesInChapter
