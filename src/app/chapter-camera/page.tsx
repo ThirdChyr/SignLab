@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AiOutlineLeft } from 'react-icons/ai';
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, removeExistingPopup } from '@/app/components/Popup';
+import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
 import '@/app/css/component.css';
 import '@/app/css/container.css';
 import '@/app/css/stage.css';
@@ -19,6 +19,22 @@ export default function Stage() {
     const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const params = useParams();
+
+    // เช็คแค่ว่ามี token หรือไม่
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        
+        if (!token) {
+            removeExistingPopup();
+            showConfirmPopup(
+                "ไม่พบข้อมูลการเข้าสู่ระบบ",
+                "กรุณาเข้าสู่ระบบเพื่อใช้งานฟีเจอร์นี้",
+                () => {
+                    router.push("/");
+                }
+            );
+        }
+    }, [router]);
 
     const getQuestionFromAnswer = (answer: string) => {
         const foundQuestion = questionData.find(item => 
@@ -324,7 +340,6 @@ export default function Stage() {
                         </p>
                     </div>
 
-                    {/* ✅ แสดงข้อความเตือนเมื่อเช็คแล้วและไม่ได้เชื่อมต่อ */}
                     {hasCheckedConnection && !isConnected && (
                         <div style={{
                             padding: '15px',
@@ -349,7 +364,6 @@ export default function Stage() {
                             }}>
                                 หากต้องการใช้งานฟีเจอร์นี้ กรุณาดาวน์โหลดและรันโปรแกรม
                                 <br/>
-                              
                             </p>
                             <p style={{color: 'var(--red)',fontSize: '14px',margin: '0 0 10px 0' ,fontWeight:'bold'}}>
                                 วิธีติดตั้ง
