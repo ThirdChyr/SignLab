@@ -70,8 +70,31 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     router.push(path);
   };
 
-  const logoClickHandler = () => {
-    return router.push("/");
+  const logouthandler = async () => {
+    try {
+      // ล้าง token จาก storage
+      localStorage.removeItem('token');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('token');
+
+      // ลบ key ใด ๆ ที่มีคำว่า "token"
+      Object.keys(localStorage).forEach((key) => {
+        if (key.toLowerCase().includes('token')) localStorage.removeItem(key);
+      });
+
+      // ล้าง cookie ทั้งหมด (ตั้งหมดอายุเป็นอดีต)
+      document.cookie.split(';').forEach((c) => {
+        document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date(0).toUTCString() + ';path=/');
+      });
+
+      removeExistingPopup();
+      showSuccessPopup('ลงชื่อออกเรียบร้อย');
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      router.push('/');
+    }
   }
 
   return (
@@ -116,7 +139,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
                 icon={<IoPersonSharp size={20} />}
                 label="โปรไฟล์ของฉัน"
               />
-              <button className='Lesson_Button' style={{backgroundColor:"var(--red)"}} onClick={() => handleNavigation("/")}><h1 className = "font_description_white regular">ลงชื่อออก</h1></button>
+              <button className='Lesson_Button' style={{backgroundColor:"var(--red)"}} onClick={() => logouthandler()}><h1 className = "font_description_white regular">ลงชื่อออก</h1></button>
             </nav>
           </div>
           
