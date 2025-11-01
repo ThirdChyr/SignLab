@@ -13,10 +13,13 @@ export default function Stage() {
     const [mqttData, setMqttData] = useState('');
     const [isCorrect, setIsCorrect] = useState(false);
     const [lastMqttData, setLastMqttData] = useState('');
+    const [isConnected, setIsConnected] = useState(false);
+    const [isFirstConnection, setIsFirstConnection] = useState(true);
+    const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
+    const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const params = useParams();
 
-    // ฟังก์ชันสำหรับ mapping คำตอบ (ภาษาอังกฤษ) เป็นคำถาม (ภาษาไทย)
     const getQuestionFromAnswer = (answer: string) => {
         const foundQuestion = questionData.find(item => 
             item.answer.toLowerCase() === answer.toLowerCase()
@@ -120,21 +123,26 @@ export default function Stage() {
 
     const fetchMqttData = async () => {
         try {
-            const response = await fetch('http://130.33.96.46:3000/api/mqtt/answer');
+            const response = await fetch('http://localhost:5050/gesture');
             const data = await response.json();
             
-            if (data && data.data) {
-                const receivedAnswer = data.data.trim().replace(/\r\n/g, '').toLowerCase();
-                
+            if (!isConnected) {
+                setIsConnected(true);
+                setHasCheckedConnection(true);
+                if (isFirstConnection) {
+                    setIsFirstConnection(false);
+                    showSuccessPopup('🎉 เชื่อมต่อ API สำเร็จ!');
+                }
+            }
             
+            if (data && data.gesture) {
+                const receivedAnswer = data.gesture.trim().toLowerCase();
+                
                 if (receivedAnswer !== lastMqttData && receivedAnswer !== '') {     
-                    
                     setMqttData(receivedAnswer);
                     setLastMqttData(receivedAnswer);
                     
-                   
                     if (currentQuestion && receivedAnswer === currentQuestion.correctAnswer.toLowerCase()) {
-                        
                         setIsCorrect(true);
                         showSuccessPopup(`ถูกต้อง! คำตอบคือ: ${currentQuestion.correctAnswer}`);
                         
@@ -142,39 +150,53 @@ export default function Stage() {
                             startNewQuestion();
                             setIsCorrect(false);
                         }, 2000);
-                        
                     } 
-                } else {
-                   
-                    console.log(" ข้อมูลเดิม - ไม่ต้องเช็ค");
                 }
             } else {
-               
-                if (mqttData !== 'ไม่มีข้อมูล') {
+                if (mqttData !== 'ไม่มีข้อมูล' && isConnected) {
                     setMqttData('ไม่มีข้อมูล');
                 }
             }
         } catch (error) {
-            console.error("Error fetching MQTT data:", error);
-            if (mqttData !== 'ไม่สามารถเชื่อมต่อ API ได้') {
-                setMqttData('ไม่สามารถเชื่อมต่อ API ได้');
+            if (!hasCheckedConnection) {
+                setHasCheckedConnection(true);
+            }
+            
+            if (isConnected) {
+                setIsConnected(false);
+                if (mqttData !== 'ไม่สามารถเชื่อมต่อ API ได้') {
+                    setMqttData('ไม่สามารถเชื่อมต่อ API ได้');
+                }
+                
+                if (retryTimeoutRef.current) {
+                    clearTimeout(retryTimeoutRef.current);
+                }
+                
+                retryTimeoutRef.current = setTimeout(() => {
+                    fetchMqttData();
+                }, 5000);
             }
         }
     };
 
-  
     useEffect(() => {
-        const interval = setInterval(() => {
+        let interval: NodeJS.Timeout;
+        
+        if (isConnected) {
+            interval = setInterval(() => {
+                fetchMqttData();
+            }, 1000);
+        } else {
             fetchMqttData();
-        }, 1000); 
-
-       
-        fetchMqttData();
+        }
         
         return () => {
-            clearInterval(interval);
+            if (interval) clearInterval(interval);
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current);
+            }
         };
-    }, [currentQuestion, lastMqttData, mqttData]);
+    }, [currentQuestion, lastMqttData, mqttData, isConnected]);
 
     const generateRandomQuestion = () => {
         const randomIndex = Math.floor(Math.random() * questionData.length);
@@ -198,6 +220,7 @@ export default function Stage() {
 
     useEffect(() => {
         startNewQuestion();
+        fetchMqttData();
     }, []);
 
     return (
@@ -231,7 +254,6 @@ export default function Stage() {
                 alignItems: 'center',
                 gap: '10px'
             }}>
-                {/* วิดีโอตัวอย่าง */}
                 <div style={{ 
                     display: 'flex', 
                     justifyContent: 'center',
@@ -268,7 +290,6 @@ export default function Stage() {
                     )}
                 </div>
 
-                {/* แสดงคำตอบ */}
                 <div style={{ textAlign: 'center', color: 'var(--foreground)', marginBottom: '20px' }}>
                     <h2 style={{ 
                         fontSize: '36px', 
@@ -290,7 +311,8 @@ export default function Stage() {
                         padding: '10px',
                         background: 'rgba(255, 255, 255, 0.8)',
                         borderRadius: '8px',
-                        border: '1px solid rgba(34, 197, 94, 0.2)'
+                        border: '1px solid rgba(34, 197, 94, 0.2)',
+                        marginTop: '15px'
                     }}>
                         <p style={{
                             color: 'var(--foreground)', 
@@ -300,10 +322,61 @@ export default function Stage() {
                         }}>
                             คำตอบล่าสุด : {mqttData ? getQuestionFromAnswer(mqttData) : 'รอข้อมูล...'}
                         </p>
-                    </div>             
+                    </div>
+
+                    {/* ✅ แสดงข้อความเตือนเมื่อเช็คแล้วและไม่ได้เชื่อมต่อ */}
+                    {hasCheckedConnection && !isConnected && (
+                        <div style={{
+                            padding: '15px',
+                            background: 'rgba(251, 191, 36, 0.1)',
+                            borderRadius: '8px',
+                            border: '2px solid #fbbf24',
+                            marginTop: '15px',
+                            animation: 'fadeIn 0.5s ease-in'
+                        }}>
+                            <p style={{
+                                color: '#f59e0b',
+                                fontSize: '16px',
+                                margin: '0 0 10px 0',
+                                fontWeight: 'bold'
+                            }}>
+                                ⚠️ ไม่สามารถเชื่อมต่อ API ได้
+                            </p>
+                            <p style={{
+                                color: 'var(--foreground)',
+                                fontSize: '14px',
+                                margin: '0 0 10px 0'
+                            }}>
+                                หากต้องการใช้งานฟีเจอร์นี้ กรุณาดาวน์โหลดและรันโปรแกรม
+                            </p>
+                            <a 
+                                href="https://github.com/Sign-Labs/Machine-Learning-Full/releases/download/sign/Signlab.exe"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                    display: 'inline-block',
+                                    padding: '10px 20px',
+                                    background: 'var(--boldskyblue)',
+                                    color: 'white',
+                                    textDecoration: 'none',
+                                    borderRadius: '8px',
+                                    fontSize: '14px',
+                                    fontWeight: 'bold',
+                                    transition: 'all 0.3s ease'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.background = '#1e40af';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.background = 'var(--boldskyblue)';
+                                }}
+                            >
+                                📥 ดาวน์โหลด Signlab.exe
+                            </a>
+                        </div>
+                    )}
                 </div>
 
-                {/* ปุ่มควบคุม */}
                 <div style={{ 
                     display: 'flex', 
                     gap: '15px', 
@@ -339,6 +412,19 @@ export default function Stage() {
                     </button>
                 </div>
             </div>
+
+            <style jsx>{`
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}</style>
         </main>
     );
 }
