@@ -32,15 +32,18 @@ export default function Lessons() {
                 const token = localStorage.getItem("token");
                 
                 if (!token) {
-                    showErrorPopup("ไม่สามารถดึงข้อมูลผู้ใช้ได้ กรุณาเข้าสู่ระบบใหม่");
-                    // ← เพิ่ม delay ก่อน redirect
-                    setTimeout(() => {
-                        router.push("/login");
-                    }, 10000);
+                    removeExistingPopup();
+                    showConfirmPopup(
+                        "ไม่พบข้อมูลการเข้าสู่ระบบ",
+                        "กรุณาเข้าสู่ระบบเพื่อใช้งานฟีเจอร์นี้",
+                        () => {
+                            router.push("/");
+                            console.log("flow this");
+                        }
+                    );
                     return;
                 }
 
-                // ← แก้ไข: เช็ค token ก่อนใช้
                 const decoded: any = jwtDecode(token);
                 console.log("User ID from token:", decoded.id);
 
@@ -49,7 +52,6 @@ export default function Lessons() {
                     const user = userRes.data.user;
                     setUserName(user.name || user.username || "ผู้ใช้");
 
-                    // ดึง progress ของ user คนนี้
                     const progressRes = await axiosInstance.get(`/stage-progress/${decoded.id}`);
                     if (progressRes.data.success && progressRes.data.progress) {
                         setUserProgress({
@@ -65,16 +67,25 @@ export default function Lessons() {
                 }
             } catch (err: any) {
                 console.error("Error fetching user data:", err);
-                // หาก token หมดอายุหรือล้มเหลว
                 if (err.response?.status === 401) {
                     localStorage.removeItem("token");
-                    showErrorPopup("ไม่สามารถดึงข้อมูลผู้ใช้ได้ กรุณาเข้าสู่ระบบใหม่");
-                    // ← เพิ่ม delay ก่อน redirect
-                    setTimeout(() => {
-                        router.push("/login");
-                    }, 10000);
+                    removeExistingPopup();
+                    showConfirmPopup(
+                        "เซสชันหมดอายุ",
+                        "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+                        () => {
+                            router.push("/");
+                        }
+                    );
+                } else if (err.response?.status === 403) {
+                    // 403 Forbidden - ไม่แจ้งเตือนและไม่ redirect
+                    console.warn("Access forbidden (403) - No redirect");
+                    setUserName("ผู้ใช้");
+                    setUserProgress({
+                        lastCompletedChapter: 1,
+                        lastCompletedStage: 0,
+                    });
                 } else {
-                    // ใช้ค่าเริ่มต้น
                     setUserName("ผู้ใช้");
                     setUserProgress({
                         lastCompletedChapter: 1,
@@ -84,24 +95,24 @@ export default function Lessons() {
             }
         };
 
-        // ← แก้ไข: เรียก fetchUserData เฉพาะเมื่อ authenticated
         if (!loading && isAuthenticated) {
             fetchUserData();
         }
     }, [loading, isAuthenticated, router]);
 
-    // ← เพิ่ม: เช็ค authentication และแสดง popup
     useEffect(() => {
         if (!loading && !isAuthenticated) {
-            showErrorPopup("ไม่สามารถเข้าใช้งานได้ กรุณาเข้าสู่ระบบก่อน");
-            // ← delay ก่อน redirect
-            setTimeout(() => {
-                router.push("/login");
-            }, 10000);
+            removeExistingPopup();
+            showConfirmPopup(
+                "ไม่สามารถเข้าใช้งานได้",
+                "กรุณาเข้าสู่ระบบก่อนใช้งานฟีเจอร์นี้",
+                () => {
+                    router.push("/");
+                }
+            );
         }
     }, [loading, isAuthenticated, router]);
 
-    // ฟังก์ชันสำหรับแต่ละด่าน
     const toggleGrid1 = () => setshow1(!show1);
     const toggleGrid2 = () => setshow2(!show2);
     const toggleGrid3 = () => setshow3(!show3);
@@ -113,7 +124,6 @@ export default function Lessons() {
         router.push(`/lessons/chapter/stage${chapterNumber}/${stageId}`);
     }
 
-    // ← แก้ไข: แสดง Loading ขณะเช็ค authentication
     if (loading) {
         return (
             <main style={{
@@ -138,29 +148,10 @@ export default function Lessons() {
         );
     }
 
-    // ← แก้ไข: ถ้าไม่ authenticated แสดงข้อความรอ redirect
-    // if (!isAuthenticated) {
-    //     return (
-    //         <main style={{
-    //             display: "flex", 
-    //             minHeight: "100vh", 
-    //             alignItems: "center", 
-    //             justifyContent: "center"
-    //         }}>
-    //             <div style={{ textAlign: "center" }}>
-    //                 <p className="font_description">กำลังนำท่านไปยังหน้าเข้าสู่ระบบ...</p>
-    //             </div>
-    //         </main>
-    //     );
-    // }
-
     return (
         <main style={{display:"flex", minHeight:"100vh"}}>
             <div style={{ flex: 1, padding: "30px", display: "flex", flexDirection: "column", gap: "30px" }}>
-                
-
                 <div className="main_container">
-                    {/* ด่านที่ 1 */}
                     <div className="main_component" style={{backgroundColor: show1 ? "var(--skyblue)" : "transparent"}}>
                         <button onClick={toggleGrid1} className="lesson_bar" >
                             <FaList size={25} />
@@ -176,7 +167,6 @@ export default function Lessons() {
                         )}
                     </div>
 
-                    {/* ด่านที่ 2 */}
                     <div className="main_component" style={{backgroundColor: show2 ? "var(--skyblue)" : "transparent"}}>
                         <button onClick={toggleGrid2} className="lesson_bar">
                             <FaList size={25} />
@@ -192,7 +182,6 @@ export default function Lessons() {
                         )}
                     </div>
 
-                    {/* ด่านที่ 3 */}
                     <div className="main_component" style={{backgroundColor: show3 ? "var(--skyblue)" : "transparent"}}>
                         <button onClick={toggleGrid3} className="lesson_bar">
                             <FaList size={25} />
@@ -208,7 +197,6 @@ export default function Lessons() {
                         )}
                     </div>
 
-                    {/* ด่านที่ 4 */}
                     <div className="main_component" style={{backgroundColor: show4 ? "var(--skyblue)" : "transparent"}}>
                         <button onClick={toggleGrid4} className="lesson_bar">
                             <FaList size={25} />
@@ -224,7 +212,6 @@ export default function Lessons() {
                         )}
                     </div>
 
-                    {/* ด่านที่ 5 */}
                     <div className="main_component" style={{backgroundColor: show5 ? "var(--skyblue)" : "transparent"}}>
                         <button onClick={toggleGrid5} className="lesson_bar">
                             <FaList size={25} />
@@ -240,7 +227,6 @@ export default function Lessons() {
                         )}
                     </div>
 
-                    {/* Coming Soon */}
                     <div className="main_component">
                         <button className="lesson_bar coming-soon">
                             <h1 className="font_main bold lesson_text">
