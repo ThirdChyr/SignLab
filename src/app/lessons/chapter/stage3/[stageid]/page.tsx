@@ -293,7 +293,7 @@ export default function Stage() {
                             key={index}
                             style={{
                                 padding: '15px',
-                                background: '#2196f3',
+                                background: 'var(--boldskyblue)',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '10px',
