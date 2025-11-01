@@ -4,9 +4,12 @@ import "./../css/profile.css";
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import axios from '../axios';
-
+import { jwtDecode } from "jwt-decode";
+import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import { useRouter } from "next/navigation";
 
 export default function Profile() {
+    const router = useRouter();
     const [editMode, setEditMode] = useState(false);
     const [profile, setProfile] = useState({
         username: "",
@@ -16,67 +19,206 @@ export default function Profile() {
         sex: "",
         birthday: "",
         email: "",
-        password: "******"
+        password: "*******"
     });
 
+
+  const fetchUserData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        removeExistingPopup();
+        showConfirmPopup(
+          "ไม่พบข้อมูลการเข้าสู่ระบบ",
+          "กรุณาเข้าสู่ระบบเพื่อใช้งานฟีเจอร์นี้",
+          () => {
+            router.push("/");
+          }
+        );
+        return;
+      }
+
+      // ตั้ง header ให้ axios ส่ง token
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      // decode token (ตรวจสอบรูปแบบก่อนใช้งาน)
+      let decoded: any;
+      try {
+        decoded = jwtDecode(token);
+        console.log("User ID from token:", decoded.id);
+      } catch (e) {
+        console.warn("Invalid token format:", e);
+        localStorage.removeItem("token");
+        removeExistingPopup();
+        showConfirmPopup(
+          "ข้อมูลการเข้าสู่ระบบไม่ถูกต้อง",
+          "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+          () => {
+            router.push("/");
+          }
+        );
+        return;
+      }
+
+      // ตรวจสอบว่า endpoint /getdata ตอบกลับสำเร็จ
+      const userRes = await axios.get("/getdata");
+      if (!userRes.data?.success) {
+        throw new Error("Failed to fetch user data");
+      }
+
+      // ถ้าต้องการใช้ข้อมูลผู้ใช้ สามารถนำไปใช้ที่นี่
+      console.log("User data fetched:", userRes.data.user);
+
+    } catch (err: any) {
+      console.error("Error fetching user data:", err);
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        removeExistingPopup();
+        showConfirmPopup(
+          "เซสชันหมดอายุ",
+          "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+          () => {
+            router.push("/");
+          }
+        );
+      } else if (err.response?.status === 403) {
+        // 403 Forbidden - ไม่แจ้งเตือนและไม่ redirect
+        console.warn("Access forbidden (403) - No redirect");
+      } else {
+        removeExistingPopup();
+        showConfirmPopup(
+          "ไม่สามารถดึงข้อมูลผู้ใช้ได้",
+          "กรุณาลองใหม่อีกครั้ง",
+          () => {
+
+          }
+        );
+      }
+    }
+  };
+
+  useEffect(() => {
+    // เรียกเช็คผู้ใช้เมื่อเข้าหน้านี้ (mount)
+    fetchUserData();
+  }, []);
+
     useEffect(() => {
+        const token = localStorage.getItem("token");
+        
+        if (!token) {
+            removeExistingPopup();
+            showConfirmPopup(
+                "ไม่พบข้อมูลการเข้าสู่ระบบ",
+                "กรุณาเข้าสู่ระบบเพื่อใช้งานฟีเจอร์นี้",
+                () => {
+                    router.push("/");
+                }
+            );
+            return;
+        }
+
         const fetchUserProfile = async () => {
             try {
                 const res = await axios.get("/getdata");
                 if (res.data.success) {
                     const user = res.data.user;
-                    const birthday = new Date(user.birthday).toISOString().split("T")[0];
+                    const birthday = user.birthday ? new Date(user.birthday).toISOString().split("T")[0] : "";
                     setProfile({
-                        username: user.username,
-                        name: user.name,
-                        surname: user.surname,
-                        tel: user.tel,
-                        sex: user.sex,
+                        username: user.username || "",
+                        name: user.name || "",
+                        surname: user.surname || "",
+                        tel: user.tel || "",
+                        sex: user.sex || "",
                         birthday,
-                        email: user.email,
+                        email: user.email || "",
                         password: "*******"
                     });
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Error loading profile:", err);
+                if (err.response?.status === 401) {
+                    localStorage.removeItem("token");
+                    removeExistingPopup();
+                    showConfirmPopup(
+                        "เซสชันหมดอายุ",
+                        "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+                        () => {
+                            router.push("/");
+                        }
+                    );
+                } else if (err.response?.status === 403) {
+                    console.warn("Access forbidden (403) - No redirect");
+                } else {
+                    showErrorPopup("ไม่สามารถโหลดข้อมูลโปรไฟล์ได้");
+                }
             }
         };
 
         fetchUserProfile();
-    }, []);
+    }, [router]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setProfile({ ...profile, [e.target.name]: e.target.value });
     };
 
     const handleEdit = () => setEditMode(true);
-const handleSave = async () => {
-  try {
-    // คัดลอกข้อมูล profile
-    const dataToSend = { ...profile };
 
-    // ถ้า password ยังเป็น "*******" แปลว่ายังไม่ได้แก้ไข → ไม่ต้องส่งไป
-    if (dataToSend.password === "*******") {
-      delete dataToSend.password;
-    }
+    const handleSave = async () => {
+        try {
+            showLoadingPopup("กำลังบันทึกข้อมูล...");
 
-    const res = await axios.put("/updateprofile", dataToSend);
+            // คัดลอกข้อมูล profile และทำให้ password เป็น optional
+            const dataToSend: {
+                username: string;
+                name: string;
+                surname: string;
+                tel: string;
+                sex: string;
+                birthday: string;
+                email: string;
+                password?: string;
+            } = { ...profile };
 
-    if (res.data.success) {
-      alert("บันทึกข้อมูลเรียบร้อยแล้ว!");
-      setEditMode(false);
+            // ถ้า password ยังเป็น "*******" แปลว่ายังไม่ได้แก้ไข → ไม่ต้องส่งไป
+            if (dataToSend.password === "*******") {
+                delete dataToSend.password;
+            }
 
-      // reset password field เป็น "*******" หลังบันทึก
-      setProfile(prev => ({ ...prev, password: "*******" }));
+            const res = await axios.put("/updateprofile", dataToSend);
 
-    } else {
-      alert("อัปเดตไม่สำเร็จ");
-    }
-  } catch (err) {
-    console.error("Error saving profile:", err);
-    alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
-  }
-};
+            removeExistingPopup();
+
+            if (res.data.success) {
+                showSuccessPopup("บันทึกข้อมูลเรียบร้อยแล้ว!");
+                setEditMode(false);
+
+                // reset password field เป็น "*******" หลังบันทึก
+                setProfile(prev => ({ ...prev, password: "*******" }));
+            } else {
+                showErrorPopup("อัปเดตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+            }
+        } catch (err: any) {
+            console.error("Error saving profile:", err);
+            removeExistingPopup();
+            
+            if (err.response?.status === 401) {
+                localStorage.removeItem("token");
+                showConfirmPopup(
+                    "เซสชันหมดอายุ",
+                    "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+                    () => {
+                        router.push("/");
+                    }
+                );
+            } else if (err.response?.data?.message) {
+                showErrorPopup(err.response.data.message);
+            } else {
+                showErrorPopup("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+            }
+        }
+    };
+
     return (
         <div className="profileContainer">
             <div className="profileAvatar">
@@ -147,7 +289,7 @@ const handleSave = async () => {
                                     showMonthDropdown
                                     showYearDropdown
                                     dropdownMode="select"
-                            />
+                                />
                             </div>
                         </>
                     ) : (
@@ -182,7 +324,6 @@ const handleSave = async () => {
                     )}
                 </div>
 
-                {/* อีเมล */}
                 <input
                     type="email"
                     name="email"
