@@ -1,26 +1,142 @@
-"use client"
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+"use client";
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { AiOutlineLeft } from 'react-icons/ai';
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import { showSuccessPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
 import '@/app/css/component.css';
 import '@/app/css/container.css';
 import '@/app/css/stage.css';
 
+interface Question {
+    id: number;
+    question: string;
+    answer: string;
+    hint: string;
+    video: string;
+}
+
+interface CurrentQuestion {
+    correctAnswer: string;
+    question: string;
+    hint: string;
+    video: string;
+}
+
+interface GestureResponse {
+    gesture?: string;
+}
+
+// ✅ ย้าย questionData ออกนอก component
+const questionData: Question[] = [
+    {
+        id: 1,
+        question: "ฉัน",
+        answer: "me",
+        hint: "ตัวเอง",
+        video: "/chapter/stage1/01.mp4",
+    },
+    {
+        id: 2,
+        question: "ขอโทษ",
+        answer: "sorry",
+        hint: "คำที่ใช้แสดงความรู้สึกผิด",
+        video: "/chapter/stage1/02.mp4",
+    },
+    {
+        id: 3,
+        question: "ขอบคุณ",
+        answer: "thank",
+        hint: "ใช้แสดงความรู้สึกขอบคุณ",
+        video: "/chapter/stage1/03.mp4",
+    },
+    {
+        id: 4,
+        question: "สวัสดี",
+        answer: "hello",
+        hint: "คำทักทาย",
+        video: "/chapter/stage1/04.mp4",
+    },
+    {
+        id: 5,
+        question: "แนะนำ",
+        answer: "introduce",
+        hint: "แนะนำตัวหรือสิ่งของ",
+        video: "/chapter/stage1/05.mp4",
+    },
+    {
+        id: 6,
+        question: "สบายดี",
+        answer: "fine",
+        hint: "คำตอบเมื่อมีคนถามว่าสบายดีไหม",
+        video: "/chapter/stage1/06.mp4",
+    },
+    {
+        id: 7,
+        question: "พบ (คนหนึ่งและอีกคนหนึ่งพบกัน)",
+        answer: "meet",
+        hint: "คนหนึ่งและอีกคนหนึ่งพบกัน",
+        video: "/chapter/stage1/07.mp4",
+    },
+    {
+        id: 8,
+        question: "พบ (คุณพบกับฉัน)",
+        answer: "meet",
+        hint: "คุณพบกับฉัน",
+        video: "/chapter/stage1/08.mp4",
+    },
+    {
+        id: 9,
+        question: "ชื่อภาษามือ",
+        answer: "signname",
+        hint: "ชื่อของภาษามือ",
+        video: "/chapter/stage1/09.mp4",
+    },
+    {
+        id: 10,
+        question: "ไม่เป็นไร",
+        answer: "noproblem",
+        hint: "คำที่ใช้เมื่อให้อภัยหรือไม่ถือสา",
+        video: "/chapter/stage1/10.mp4",
+    },
+    {
+        id: 11,
+        question: "ไม่สบาย",
+        answer: "unwell",
+        hint: "รู้สึกเจ็บป่วย",
+        video: "/chapter/stage1/11.mp4",
+    },
+    {
+        id: 12,
+        question: "ใช่",
+        answer: "yes",
+        hint: "คำยืนยัน",
+        video: "/chapter/stage1/12.mp4",
+    },
+    {
+        id: 13,
+        question: "ไม่ใช่",
+        answer: "no",
+        hint: "คำปฏิเสธ",
+        video: "/chapter/stage1/13.mp4",
+    },
+];
+
 export default function Stage() {
     const router = useRouter();
-    const [currentQuestion, setCurrentQuestion] = useState<any>(null);
+    const [currentQuestion, setCurrentQuestion] = useState<CurrentQuestion | null>(null);
     const [mqttData, setMqttData] = useState('');
     const [isCorrect, setIsCorrect] = useState(false);
     const [lastMqttData, setLastMqttData] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const [isFirstConnection, setIsFirstConnection] = useState(true);
     const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
+    
+    // ✅ ใช้ useRef สำหรับ interval และ timeout
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const isInitialized = useRef(false);
 
-    const params = useParams();
-
-    // เช็คแค่ว่ามี token หรือไม่
+    // ✅ ตรวจสอบ token แค่ครั้งเดียว
     useEffect(() => {
         const token = localStorage.getItem("token");
         
@@ -36,111 +152,39 @@ export default function Stage() {
         }
     }, [router]);
 
-    const getQuestionFromAnswer = (answer: string) => {
+    // ✅ ลบ dependencies ที่ทำให้เกิด loop
+    const getQuestionFromAnswer = useCallback((answer: string) => {
         const foundQuestion = questionData.find(item => 
             item.answer.toLowerCase() === answer.toLowerCase()
         );
         return foundQuestion ? foundQuestion.question : answer;
-    };
+    }, []);
 
-    const questionData = [
-        {
-            id: 1,
-            question: "ฉัน",
-            answer: "me",
-            hint: "ตัวเอง",
-            video: "/chapter/stage1/01.mp4",
-        },
-        {
-            id: 2,
-            question: "ขอโทษ",
-            answer: "sorry",
-            hint: "คำที่ใช้แสดงความรู้สึกผิด",
-            video: "/chapter/stage1/02.mp4",
-        },
-        {
-            id: 3,
-            question: "ขอบคุณ",
-            answer: "thank",
-            hint: "ใช้แสดงความรู้สึกขอบคุณ",
-            video: "/chapter/stage1/03.mp4",
-        },
-        {
-            id: 4,
-            question: "สวัสดี",
-            answer: "hello",
-            hint: "คำทักทาย",
-            video: "/chapter/stage1/04.mp4",
-        },
-        {
-            id: 5,
-            question: "แนะนำ",
-            answer: "introduce",
-            hint: "แนะนำตัวหรือสิ่งของ",
-            video: "/chapter/stage1/05.mp4",
-        },
-        {
-            id: 6,
-            question: "สบายดี",
-            answer: "fine",
-            hint: "คำตอบเมื่อมีคนถามว่าสบายดีไหม",
-            video: "/chapter/stage1/06.mp4",
-        },
-        {
-            id: 7,
-            question: "พบ (คนหนึ่งและอีกคนหนึ่งพบกัน)",
-            answer: "meet",
-            hint: "คนหนึ่งและอีกคนหนึ่งพบกัน",
-            video: "/chapter/stage1/07.mp4",
-        },
-        {
-            id: 8,
-            question: "พบ (คุณพบกับฉัน)",
-            answer: "meet",
-            hint: "คุณพบกับฉัน",
-            video: "/chapter/stage1/08.mp4",
-        },
-        {
-            id: 9,
-            question: "ชื่อภาษามือ",
-            answer: "signname",
-            hint: "ชื่อของภาษามือ",
-            video: "/chapter/stage1/09.mp4",
-        },
-        {
-            id: 10,
-            question: "ไม่เป็นไร",
-            answer: "noproblem",
-            hint: "คำที่ใช้เมื่อให้อภัยหรือไม่ถือสา",
-            video: "/chapter/stage1/10.mp4",
-        },
-        {
-            id: 11,
-            question: "ไม่สบาย",
-            answer: "unwell",
-            hint: "รู้สึกเจ็บป่วย",
-            video: "/chapter/stage1/11.mp4",
-        },
-        {
-            id: 12,
-            question: "ใช่",
-            answer: "yes",
-            hint: "คำยืนยัน",
-            video: "/chapter/stage1/12.mp4",
-        },
-        {
-            id: 13,
-            question: "ไม่ใช่",
-            answer: "no",
-            hint: "คำปฏิเสธ",
-            video: "/chapter/stage1/13.mp4",
-        },
-    ];
+    const generateRandomQuestion = useCallback((): CurrentQuestion => {
+        const randomIndex = Math.floor(Math.random() * questionData.length);
+        const selectedQuestion = questionData[randomIndex];
+        
+        return {
+            correctAnswer: selectedQuestion.answer,
+            question: selectedQuestion.question,
+            hint: selectedQuestion.hint,
+            video: selectedQuestion.video
+        };
+    }, []);
 
-    const fetchMqttData = async () => {
+    const startNewQuestion = useCallback(() => {
+        const newQuestion = generateRandomQuestion();
+        setCurrentQuestion(newQuestion);
+        setIsCorrect(false);
+        setMqttData('');
+        setLastMqttData('');
+    }, [generateRandomQuestion]);
+
+    // ✅ แก้ไข fetchMqttData ป้องกัน loop
+    const fetchMqttData = useCallback(async () => {
         try {
             const response = await fetch('http://localhost:5050/gesture');
-            const data = await response.json();
+            const data: GestureResponse = await response.json();
             
             if (!isConnected) {
                 setIsConnected(true);
@@ -174,15 +218,15 @@ export default function Stage() {
                 }
             }
         } catch (error) {
+            console.error('API Connection Error:', error);
+            
             if (!hasCheckedConnection) {
                 setHasCheckedConnection(true);
             }
             
             if (isConnected) {
                 setIsConnected(false);
-                if (mqttData !== 'ไม่สามารถเชื่อมต่อ API ได้') {
-                    setMqttData('ไม่สามารถเชื่อมต่อ API ได้');
-                }
+                setMqttData('ไม่สามารถเชื่อมต่อ API ได้');
                 
                 if (retryTimeoutRef.current) {
                     clearTimeout(retryTimeoutRef.current);
@@ -193,51 +237,38 @@ export default function Stage() {
                 }, 5000);
             }
         }
-    };
+    }, [currentQuestion, lastMqttData, mqttData, isConnected, hasCheckedConnection, isFirstConnection, startNewQuestion]);
 
+    // ✅ แยก useEffect สำหรับ initialization
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        if (!isInitialized.current) {
+            isInitialized.current = true;
+            startNewQuestion();
+            fetchMqttData();
+        }
+    }, [startNewQuestion, fetchMqttData]);
+
+    // ✅ แยก useEffect สำหรับ interval
+    useEffect(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+        }
         
         if (isConnected) {
-            interval = setInterval(() => {
+            intervalRef.current = setInterval(() => {
                 fetchMqttData();
             }, 1000);
-        } else {
-            fetchMqttData();
         }
         
         return () => {
-            if (interval) clearInterval(interval);
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
             if (retryTimeoutRef.current) {
                 clearTimeout(retryTimeoutRef.current);
             }
         };
-    }, [currentQuestion, lastMqttData, mqttData, isConnected]);
-
-    const generateRandomQuestion = () => {
-        const randomIndex = Math.floor(Math.random() * questionData.length);
-        const selectedQuestion = questionData[randomIndex];
-        
-        return {
-            correctAnswer: selectedQuestion.answer,
-            question: selectedQuestion.question,
-            hint: selectedQuestion.hint,
-            video: selectedQuestion.video
-        };
-    };
-
-    const startNewQuestion = () => {
-        const newQuestion = generateRandomQuestion();
-        setCurrentQuestion(newQuestion);
-        setIsCorrect(false);
-        setMqttData('');
-        setLastMqttData('');
-    };
-
-    useEffect(() => {
-        startNewQuestion();
-        fetchMqttData();
-    }, []);
+    }, [isConnected, fetchMqttData]);
 
     return (
         <main className='container_outer'>
@@ -372,7 +403,7 @@ export default function Stage() {
                                 <br/>
                                 2. รันโปรแกรม Signlab.exe (อาจจะใช้เวลาในการทำงาน)
                                 <br />
-                                3. หากโปรแกรมเปิดทำงานแล้วให้สุ่มคำถามขึ้นมาใหม่เพื่อเชื่อมต่อ
+                                3. หากโปรแกรมเปิดทำงานแล้วให้รีหน้าใหม่เพื่อเชื่อมต่อ
                             </p>
                             
                             <a 
