@@ -86,8 +86,11 @@
 .ranking-row {
   padding: 20px;
   border-bottom: 1px solid #ccc;
-  font-size: 1.3rem;
-  font-weight: 500;
+  font-size: 26px;
+  font-weight: bold;
+  font-family: 'kanit';
+  
+  
   background: #fff;
 }
 
