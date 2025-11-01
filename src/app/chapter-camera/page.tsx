@@ -348,7 +348,19 @@ export default function Stage() {
                                 margin: '0 0 10px 0'
                             }}>
                                 หากต้องการใช้งานฟีเจอร์นี้ กรุณาดาวน์โหลดและรันโปรแกรม
+                                <br/>
+                              
                             </p>
+                            <p style={{color: 'var(--red)',fontSize: '14px',margin: '0 0 10px 0' ,fontWeight:'bold'}}>
+                                วิธีติดตั้ง
+                                <br/>
+                                1. Download ตามปุ่มข้างล่าง
+                                <br/>
+                                2. รันโปรแกรม Signlab.exe (อาจจะใช้เวลาในการทำงาน)
+                                <br />
+                                3. หากโปรแกรมเปิดทำงานแล้วให้สุ่มคำถามขึ้นมาใหม่เพื่อเชื่อมต่อ
+                            </p>
+                            
                             <a 
                                 href="https://github.com/Sign-Labs/Machine-Learning-Full/releases/download/sign/Signlab.exe"
                                 target="_blank"
@@ -408,7 +420,7 @@ export default function Stage() {
                             e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
                         }}
                     >
-                        สุ่มคำถามใหม่
+                        <h4 className='font_description_white'>สุ่มคำถามใหม่</h4>
                     </button>
                 </div>
             </div>
