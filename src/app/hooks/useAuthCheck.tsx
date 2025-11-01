@@ -1,6 +1,5 @@
-// hooks/useAuthCheck.tsx
-import { useEffect, useState } from "react";
-import axios from "@/app/axios"; // ใช้ instance ที่มี token
+import { useEffect, useState, useCallback } from "react";
+import axios from "@/app/axios";
 import { useRouter } from "next/navigation";
 
 export default function useAuthCheck() {
@@ -8,27 +7,28 @@ export default function useAuthCheck() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await axios.get("/getdata"); // ดึงข้อมูล user ด้วย token
-        if (res.data.success) {
-          setIsAuthenticated(true);
-          router.push("/lessons");
-        } else {
-          setIsAuthenticated(false);
-          router.push("/login");
-        }
-      } catch (err) {
+  const checkAuth = useCallback(async () => {
+    try {
+      const response = await axios.get("/getdata");
+      if (response.data.success) {
+        setIsAuthenticated(true);
+        router.push("/lessons");
+      } else {
         setIsAuthenticated(false);
         router.push("/login");
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Auth check failed:", error);
+      setIsAuthenticated(false);
+      router.push("/login");
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
+  useEffect(() => {
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   return { loading, isAuthenticated };
 }
