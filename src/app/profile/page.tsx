@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "./../css/profile.css";
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -7,6 +7,31 @@ import axios from '../axios';
 import { jwtDecode } from "jwt-decode";
 import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
 import { useRouter } from "next/navigation";
+
+interface JwtPayload {
+    id: string;
+    email: string;
+}
+
+interface ApiError {
+    response?: {
+        status: number;
+        data?: {
+            message?: string;
+        };
+    };
+}
+
+interface UserData {
+    username?: string;
+    name?: string;
+    surname?: string;
+    tel?: string;
+    sex?: string;
+    birthday?: string;
+    email?: string;
+    password?: string;
+}
 
 export default function Profile() {
     const router = useRouter();
@@ -22,86 +47,115 @@ export default function Profile() {
         password: "*******"
     });
 
+    const fetchUserData = useCallback(async () => {
+        try {
+            const token = localStorage.getItem("token");
 
-  const fetchUserData = async () => {
-    try {
-      const token = localStorage.getItem("token");
+            if (!token) {
+                removeExistingPopup();
+                showConfirmPopup(
+                    "ไม่พบข้อมูลการเข้าสู่ระบบ",
+                    "กรุณาเข้าสู่ระบบเพื่อใช้งานฟีเจอร์นี้",
+                    () => {
+                        router.push("/");
+                    }
+                );
+                return;
+            }
 
-      if (!token) {
-        removeExistingPopup();
-        showConfirmPopup(
-          "ไม่พบข้อมูลการเข้าสู่ระบบ",
-          "กรุณาเข้าสู่ระบบเพื่อใช้งานฟีเจอร์นี้",
-          () => {
-            router.push("/");
-          }
-        );
-        return;
-      }
+            axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      // ตั้ง header ให้ axios ส่ง token
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+            try {
+                const decoded = jwtDecode<JwtPayload>(token);
+                console.log("User ID from token:", decoded.id);
+            } catch (e) {
+                console.warn("Invalid token format:", e);
+                localStorage.removeItem("token");
+                removeExistingPopup();
+                showConfirmPopup(
+                    "ข้อมูลการเข้าสู่ระบบไม่ถูกต้อง",
+                    "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+                    () => {
+                        router.push("/");
+                    }
+                );
+                return;
+            }
 
-      // decode token (ตรวจสอบรูปแบบก่อนใช้งาน)
-      let decoded: any;
-      try {
-        decoded = jwtDecode(token);
-        console.log("User ID from token:", decoded.id);
-      } catch (e) {
-        console.warn("Invalid token format:", e);
-        localStorage.removeItem("token");
-        removeExistingPopup();
-        showConfirmPopup(
-          "ข้อมูลการเข้าสู่ระบบไม่ถูกต้อง",
-          "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
-          () => {
-            router.push("/");
-          }
-        );
-        return;
-      }
+            const userRes = await axios.get("/getdata");
+            if (!userRes.data?.success) {
+                throw new Error("Failed to fetch user data");
+            }
 
-      // ตรวจสอบว่า endpoint /getdata ตอบกลับสำเร็จ
-      const userRes = await axios.get("/getdata");
-      if (!userRes.data?.success) {
-        throw new Error("Failed to fetch user data");
-      }
+            console.log("User data fetched:", userRes.data.user);
 
-      // ถ้าต้องการใช้ข้อมูลผู้ใช้ สามารถนำไปใช้ที่นี่
-      console.log("User data fetched:", userRes.data.user);
+        } catch (err) {
+            const error = err as ApiError;
+            console.error("Error fetching user data:", error);
+            if (error.response?.status === 401) {
+                localStorage.removeItem("token");
+                removeExistingPopup();
+                showConfirmPopup(
+                    "เซสชันหมดอายุ",
+                    "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+                    () => {
+                        router.push("/");
+                    }
+                );
+            } else if (error.response?.status === 403) {
+                console.warn("Access forbidden (403) - No redirect");
+            } else {
+                removeExistingPopup();
+                showConfirmPopup(
+                    "ไม่สามารถดึงข้อมูลผู้ใช้ได้",
+                    "กรุณาลองใหม่อีกครั้ง",
+                    () => {}
+                );
+            }
+        }
+    }, [router]);
 
-    } catch (err: any) {
-      console.error("Error fetching user data:", err);
-      if (err.response?.status === 401) {
-        localStorage.removeItem("token");
-        removeExistingPopup();
-        showConfirmPopup(
-          "เซสชันหมดอายุ",
-          "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
-          () => {
-            router.push("/");
-          }
-        );
-      } else if (err.response?.status === 403) {
-        // 403 Forbidden - ไม่แจ้งเตือนและไม่ redirect
-        console.warn("Access forbidden (403) - No redirect");
-      } else {
-        removeExistingPopup();
-        showConfirmPopup(
-          "ไม่สามารถดึงข้อมูลผู้ใช้ได้",
-          "กรุณาลองใหม่อีกครั้ง",
-          () => {
+    const fetchUserProfile = useCallback(async () => {
+        try {
+            const res = await axios.get("/getdata");
+            if (res.data.success) {
+                const user: UserData = res.data.user;
+                const birthday = user.birthday ? new Date(user.birthday).toISOString().split("T")[0] : "";
+                setProfile({
+                    username: user.username || "",
+                    name: user.name || "",
+                    surname: user.surname || "",
+                    tel: user.tel || "",
+                    sex: user.sex || "",
+                    birthday,
+                    email: user.email || "",
+                    password: user.password || "*******",
+                });
+            }
+        } catch (err) {
+            const error = err as ApiError;
+            console.error("Error loading profile:", error);
+            if (error.response?.status === 401) {
+                localStorage.removeItem("token");
+                removeExistingPopup();
+                showConfirmPopup(
+                    "เซสชันหมดอายุ",
+                    "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
+                    () => {
+                        router.push("/");
+                    }
+                );
+            } else if (error.response?.status === 403) {
+                console.warn("Access forbidden (403) - No redirect");
+            } else {
+                showErrorPopup("ไม่สามารถโหลดข้อมูลโปรไฟล์ได้");
+            }
+        }
+    }, [router]);
 
-          }
-        );
-      }
-    }
-  };
-
-  useEffect(() => {
-    // เรียกเช็คผู้ใช้เมื่อเข้าหน้านี้ (mount)
-    fetchUserData();
-  }, []);
+    useEffect(() => {
+        fetchUserData();
+    }, [fetchUserData]);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -118,45 +172,8 @@ export default function Profile() {
             return;
         }
 
-        const fetchUserProfile = async () => {
-            try {
-                const res = await axios.get("/getdata");
-                if (res.data.success) {
-                    const user = res.data.user;
-                    const birthday = user.birthday ? new Date(user.birthday).toISOString().split("T")[0] : "";
-                    setProfile({
-                        username: user.username || "",
-                        name: user.name || "",
-                        surname: user.surname || "",
-                        tel: user.tel || "",
-                        sex: user.sex || "",
-                        birthday,
-                        email: user.email || "",
-                        password: user.password || "*******",
-                    });
-                }
-            } catch (err: any) {
-                console.error("Error loading profile:", err);
-                if (err.response?.status === 401) {
-                    localStorage.removeItem("token");
-                    removeExistingPopup();
-                    showConfirmPopup(
-                        "เซสชันหมดอายุ",
-                        "กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
-                        () => {
-                            router.push("/");
-                        }
-                    );
-                } else if (err.response?.status === 403) {
-                    console.warn("Access forbidden (403) - No redirect");
-                } else {
-                    showErrorPopup("ไม่สามารถโหลดข้อมูลโปรไฟล์ได้");
-                }
-            }
-        };
-
         fetchUserProfile();
-    }, [router]);
+    }, [router, fetchUserProfile]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setProfile({ ...profile, [e.target.name]: e.target.value });
@@ -168,7 +185,6 @@ export default function Profile() {
         try {
             showLoadingPopup("กำลังบันทึกข้อมูล...");
 
-            // คัดลอกข้อมูล profile และทำให้ password เป็น optional
             const dataToSend: {
                 username: string;
                 name: string;
@@ -180,7 +196,6 @@ export default function Profile() {
                 password?: string;
             } = { ...profile };
 
-            // ถ้า password ยังเป็น "*******" แปลว่ายังไม่ได้แก้ไข → ไม่ต้องส่งไป
             if (dataToSend.password === "*******") {
                 delete dataToSend.password;
             }
@@ -192,17 +207,16 @@ export default function Profile() {
             if (res.data.success) {
                 showSuccessPopup("บันทึกข้อมูลเรียบร้อยแล้ว!");
                 setEditMode(false);
-
-                // reset password field เป็น "*******" หลังบันทึก
                 setProfile(prev => ({ ...prev, password: "*******" }));
             } else {
                 showErrorPopup("อัปเดตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
             }
-        } catch (err: any) {
-            console.error("Error saving profile:", err);
+        } catch (err) {
+            const error = err as ApiError;
+            console.error("Error saving profile:", error);
             removeExistingPopup();
             
-            if (err.response?.status === 401) {
+            if (error.response?.status === 401) {
                 localStorage.removeItem("token");
                 showConfirmPopup(
                     "เซสชันหมดอายุ",
@@ -211,8 +225,8 @@ export default function Profile() {
                         router.push("/");
                     }
                 );
-            } else if (err.response?.data?.message) {
-                showErrorPopup(err.response.data.message);
+            } else if (error.response?.data?.message) {
+                showErrorPopup(error.response.data.message);
             } else {
                 showErrorPopup("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
             }
