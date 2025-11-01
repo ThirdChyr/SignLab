@@ -27,7 +27,7 @@ axiosInstance.interceptors.response.use(
       console.warn("Unauthorized! Redirecting to login...");
       localStorage.removeItem("token");
       if (typeof window !== "undefined") {
-        window.location.href = "/login";
+        window.location.href = "/";
       }
     }
     return Promise.reject(error);
