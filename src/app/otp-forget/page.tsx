@@ -1,32 +1,50 @@
 "use client";
 import { AiOutlineLeft } from "react-icons/ai";
-import { useRouter,useSearchParams  } from "next/navigation"; 
-import { useState,useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation"; 
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
 import "./../css/component.css"; 
 import "./../css/container.css"; 
-import axios from "../axios"; 
+import axios from "../axios";
 
-export default function otp() {
-    const router = useRouter();
-    const [otp, setOtp] = useState(["", "", "", "","",""]);
-   const searchParams = useSearchParams();  // ดึง query string
-      const [email, setEmail] = useState("");
-     
-const data = searchParams.get("data");
-if (!data) {
-  console.error("ไม่พบ query data");
-  return;
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
 }
 
-const decoded = decodeURIComponent(data);
-const parsed = JSON.parse(decoded); // <- ต้องได้ email แน่ๆ
+interface ParsedData {
+  email: string;
+}
 
- const registrationData =data;
+function OtpForgetContent() {
+    const router = useRouter();
+    const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+    const searchParams = useSearchParams();
+    const [email, setEmail] = useState("");
+    const [registrationData, setRegistrationData] = useState("");
 
+    useEffect(() => {
+        const data = searchParams.get("data");
+        if (!data) {
+            console.error("ไม่พบ query data");
+            return;
+        }
 
+        try {
+            const decoded = decodeURIComponent(data);
+            const parsed: ParsedData = JSON.parse(decoded);
+            setEmail(parsed.email);
+            setRegistrationData(data);
+        } catch (err) {
+            console.error("Failed to parse data", err);
+        }
+    }, [searchParams]);
 
-    const handleOtpChange = (index:number, value:string) => {
+    const handleOtpChange = (index: number, value: string) => {
         if (value.length <= 1) {
             const newOtp = [...otp];
             newOtp[index] = value;
@@ -39,68 +57,58 @@ const parsed = JSON.parse(decoded); // <- ต้องได้ email แน่�
         }
     };
 
-    const handleResendOtp = async () => {
-  showConfirmPopup(
-    "ส่ง OTP ใหม่",
-    "ต้องการส่งรหัส OTP ใหม่หรือไม่?",
-    async () => {
-      showLoadingPopup("กำลังส่ง OTP", "กรุณารอสักครู่...");
-      try {
-        const res = await axios.post("/otp-forget", {
-          email: parsed.email,
-          purpose: "reset" // หรือ "reset" แล้วแต่กรณี
-        });
+    const handleResendOtp = useCallback(async () => {
+        showConfirmPopup(
+            "ส่ง OTP ใหม่",
+            "ต้องการส่งรหัส OTP ใหม่หรือไม่?",
+            async () => {
+                showLoadingPopup("กำลังส่ง OTP", "กรุณารอสักครู่...");
+                try {
+                    await axios.post("/otp-forget", {
+                        email,
+                        purpose: "reset"
+                    });
 
-        removeExistingPopup();
-        showSuccessPopup("ส่งสำเร็จ", "รหัส OTP ได้ถูกส่งไปยังอีเมลของคุณแล้ว");
-      } catch (err) {
-        console.error("Resend OTP error", err);
-        removeExistingPopup();
-        showErrorPopup("ส่งไม่สำเร็จ", "ไม่สามารถส่ง OTP ได้ กรุณาลองใหม่");
-      }
-    }
-  );
-};
+                    removeExistingPopup();
+                    showSuccessPopup("ส่งสำเร็จ", "รหัส OTP ได้ถูกส่งไปยังอีเมลของคุณแล้ว");
+                } catch (err) {
+                    console.error("Resend OTP error", err);
+                    removeExistingPopup();
+                    showErrorPopup("ส่งไม่สำเร็จ", "ไม่สามารถส่ง OTP ได้ กรุณาลองใหม่");
+                }
+            }
+        );
+    }, [email]);
 
-   const handleSubmit = async () => {
-  const otpCode = otp.join("");
+    const handleSubmit = useCallback(async () => {
+        const otpCode = otp.join("");
 
-  if (otpCode.length === 6) {
-    showLoadingPopup("กำลังตรวจสอบ", "กรุณารอสักครู่...");
+        if (otpCode.length === 6) {
+            showLoadingPopup("กำลังตรวจสอบ", "กรุณารอสักครู่...");
 
-    try {
-      // ตรวจสอบ OTP ก่อน
-      await axios.post("/verify-otp", {
-        email:parsed.email,
-        otp: otpCode
-      });
+            try {
+                await axios.post("/verify-otp", {
+                    email,
+                    otp: otpCode
+                });
 
-     
+                removeExistingPopup();
+                showSuccessPopup("สำเร็จ", "กรุณาเปลี่ยนรหัสผ่าน", () => {
+                    router.push(`/change-password?data=${registrationData}`);
+                });
 
-     
-      
+            } catch (err) {
+                const error = err as ApiError;
+                console.error("ERROR:", error.response?.data || error.message);
+                removeExistingPopup();
 
-      // ✅ เรียก API register
-      
-
-      removeExistingPopup();
-      showSuccessPopup("สำเร็จ", "กรุณาเปลี่ยนรหัสผ่าน", () => {
-        router.push(`/change-password?data=${registrationData}`);
-      });
-
-    } catch (err: any) {
-      
-       console.error("ERROR:", err.response?.data || err.message);
-      removeExistingPopup();
-
-      const msg =
-        err?.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
-      showErrorPopup("ไม่สำเร็จ", msg);
-    }
-  } else {
-    showErrorPopup("ข้อมูลไม่ถูกต้อง", "กรุณากรอก OTP ให้ครบ 6 หลัก");
-  }
-};
+                const msg = error?.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
+                showErrorPopup("ไม่สำเร็จ", msg);
+            }
+        } else {
+            showErrorPopup("ข้อมูลไม่ถูกต้อง", "กรุณากรอก OTP ให้ครบ 6 หลัก");
+        }
+    }, [otp, email, registrationData, router]);
 
     return (
         <main className="container_outer">
@@ -141,7 +149,7 @@ const parsed = JSON.parse(decoded); // <- ต้องได้ email แน่�
                             className="otp_resend_link"
                             style={{background: 'none', border: 'none', padding: 0, cursor: 'pointer'}}
                         >
-                            <h1 className="font_description"><p className="otp_resend_link bold">ส่งอีกครั้ง</p></h1>
+                            <span className="otp_resend_link bold">ส่งอีกครั้ง</span>
                         </button>
                     </h1>
                     <div>
@@ -152,5 +160,35 @@ const parsed = JSON.parse(decoded); // <- ต้องได้ email แน่�
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function OtpForgetPage() {
+    return (
+        <Suspense fallback={
+            <main className="container_outer">
+                <div style={{
+                    display: "flex", 
+                    minHeight: "100vh", 
+                    alignItems: "center", 
+                    justifyContent: "center"
+                }}>
+                    <div style={{ textAlign: "center" }}>
+                        <div style={{
+                            border: "4px solid #f3f3f3",
+                            borderTop: "4px solid #3498db",
+                            borderRadius: "50%",
+                            width: "40px",
+                            height: "40px",
+                            animation: "spin 1s linear infinite",
+                            margin: "0 auto 20px"
+                        }}></div>
+                        <p className="font_description">กำลังโหลด...</p>
+                    </div>
+                </div>
+            </main>
+        }>
+            <OtpForgetContent />
+        </Suspense>
     );
 }

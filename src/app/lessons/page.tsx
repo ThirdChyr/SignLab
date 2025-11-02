@@ -1,15 +1,20 @@
 "use client"
-import { GiNotebook } from "react-icons/gi";
-import Lesson from "../components/Genlessons";
+// ลบ imports ที่ไม่ได้ใช้
 import LessonGrid from "../components/Lessongrid";
 import { useRouter } from "next/navigation";
 import { FaList } from "react-icons/fa6";
 import "../css/lessons.css";
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import { showConfirmPopup, removeExistingPopup } from "../components/Popup";
 import { useState, useEffect } from "react";
 import axiosInstance from "../axios";
 import useAuthCheck from "../hooks/useAuthCheck";
 import { jwtDecode } from "jwt-decode";
+
+// สร้าง interface สำหรับ JWT payload
+interface JwtPayload {
+    id: string;
+    email: string;
+}
 
 export default function Lessons() {
     const router = useRouter();
@@ -20,7 +25,6 @@ export default function Lessons() {
     const [show5, setshow5] = useState(false);
     const { loading, isAuthenticated } = useAuthCheck();
 
-    const [userName, setUserName] = useState("ผู้ใช้");
     const [userProgress, setUserProgress] = useState({
         lastCompletedChapter: 0,
         lastCompletedStage: 0,
@@ -38,20 +42,16 @@ export default function Lessons() {
                         "กรุณาเข้าสู่ระบบเพื่อใช้งานฟีเจอร์นี้",
                         () => {
                             router.push("/");
-                            console.log("flow this");
                         }
                     );
                     return;
                 }
 
-                const decoded: any = jwtDecode(token);
+                const decoded = jwtDecode<JwtPayload>(token);
                 console.log("User ID from token:", decoded.id);
 
                 const userRes = await axiosInstance.get("/getdata");
                 if (userRes.data.success) {
-                    const user = userRes.data.user;
-                    setUserName(user.name || user.username || "ผู้ใช้");
-
                     const progressRes = await axiosInstance.get(`/stage-progress/${decoded.id}`);
                     if (progressRes.data.success && progressRes.data.progress) {
                         setUserProgress({
@@ -65,9 +65,11 @@ export default function Lessons() {
                         });
                     }
                 }
-            } catch (err: any) {
+            } catch (err) {
                 console.error("Error fetching user data:", err);
-                if (err.response?.status === 401) {
+                const error = err as { response?: { status?: number } };
+                
+                if (error.response?.status === 401) {
                     localStorage.removeItem("token");
                     removeExistingPopup();
                     showConfirmPopup(
@@ -77,16 +79,13 @@ export default function Lessons() {
                             router.push("/");
                         }
                     );
-                } else if (err.response?.status === 403) {
-                    // 403 Forbidden - ไม่แจ้งเตือนและไม่ redirect
+                } else if (error.response?.status === 403) {
                     console.warn("Access forbidden (403) - No redirect");
-                    setUserName("ผู้ใช้");
                     setUserProgress({
                         lastCompletedChapter: 1,
                         lastCompletedStage: 0,
                     });
                 } else {
-                    setUserName("ผู้ใช้");
                     setUserProgress({
                         lastCompletedChapter: 1,
                         lastCompletedStage: 0,

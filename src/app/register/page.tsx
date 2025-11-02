@@ -2,13 +2,26 @@
 import { AiOutlineLeft } from "react-icons/ai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {DatePicker} from "@heroui/date-picker";
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import { showLoadingPopup, showSuccessPopup, showErrorPopup, removeExistingPopup } from "../components/Popup";
 import "../css/component.css";
 import "../css/container.css";
-import axios from "../axios"; 
+import axios from "../axios";
+import Image from 'next/image';
+
+interface ApiError {
+    response?: {
+        status?: number;
+        data?: {
+            conflicts?: {
+                username?: string;
+                email?: string;
+            };
+            message?: string;
+        };
+    };
+}
 
 export default function Register() {
     const router = useRouter();
@@ -21,36 +34,37 @@ export default function Register() {
         email: "",
         password: "",
         confirmPassword: "",
-        tel:""
+        tel: ""
     });
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [birthday, setDob] = useState<Date | null>(null);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setForm({ ...form, [e.target.name]: e.target.value });
     };
-     const handleCheckUser = async () => {
-  try {
-    const res = await axios.post("/check-user", {
-      username: form.username,
-      email: form.email
-    });
-    return res.data.success === true;
-  } catch (err: any) {
-    if (err.response?.status === 409) {
-      const conflict = err.response.data.conflicts;
-      if (conflict.username) showErrorPopup("ชื่อผู้ใช้นี้ถูกใช้แล้ว", conflict.username);
-      if (conflict.email) showErrorPopup("อีเมลนี้ถูกใช้แล้ว", conflict.email);
-    } else {
-      showErrorPopup("เกิดข้อผิดพลาด", "ไม่สามารถตรวจสอบชื่อผู้ใช้ได้");
-    }
-    return false;
-  }
-};
 
-   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-        
+    const handleCheckUser = async () => {
+        try {
+            const res = await axios.post("/check-user", {
+                username: form.username,
+                email: form.email
+            });
+            return res.data.success === true;
+        } catch (err) {
+            const error = err as ApiError;
+            if (error.response?.status === 409) {
+                const conflict = error.response.data?.conflicts;
+                if (conflict?.username) showErrorPopup("ชื่อผู้ใช้นี้ถูกใช้แล้ว", conflict.username);
+                if (conflict?.email) showErrorPopup("อีเมลนี้ถูกใช้แล้ว", conflict.email);
+            } else {
+                showErrorPopup("เกิดข้อผิดพลาด", "ไม่สามารถตรวจสอบชื่อผู้ใช้ได้");
+            }
+            return false;
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
         if (!form.username.trim()) {
             showErrorPopup("ข้อมูลไม่ครบถ้วน", "กรุณากรอกชื่อผู้ใช้");
             return;
@@ -96,40 +110,44 @@ export default function Register() {
             showErrorPopup("รหัสผ่านไม่ตรงกัน", "กรุณากรอกรหัสผ่านและยืนยันรหัสผ่านให้ตรงกัน");
             return;
         }
-         const valid = await handleCheckUser();
-          if (!valid) return;
-        // ถ้าผ่านการตรวจสอบทั้งหมดแล้ว
+
+        const valid = await handleCheckUser();
+        if (!valid) return;
+
         showLoadingPopup("กำลังส่ง OTP", "กรุณารอสักครู่...");
-         try {
-    const otpRes =  await  axios.post("send-otp", {
-      email: form.email,
-        purpose: "register"
-    });
-    if (otpRes.data.success) {
-      removeExistingPopup();
-      showSuccessPopup("ส่งรหัส OTP สำเร็จ", "กรุณาตรวจสอบอีเมลของคุณ", () => {
-        const registrationData = encodeURIComponent(JSON.stringify({
-          username: form.username,
-          name: form.firstname,
-          surname: form.lastname,
-          sex: form.sex,
-          birthday: form.birthday,
-          email: form.email,
-          password: form.password,
-          tel: form.tel
-        }));
-        router.push(`/otp?type=register&data=${registrationData}`);
-      });
-    } else {
-      removeExistingPopup();
-      showErrorPopup("ส่งรหัส OTP ล้มเหลว", otpRes.data.message || "ไม่สามารถส่งอีเมลได้");
-    }
-  } catch (err) {
-    console.error("OTP error", err);
-    removeExistingPopup();
-    showErrorPopup("เกิดข้อผิดพลาด", "ไม่สามารถส่งรหัส OTP ได้");
-  }
-};
+
+        try {
+            const otpRes = await axios.post("send-otp", {
+                email: form.email,
+                purpose: "register"
+            });
+
+            if (otpRes.data.success) {
+                removeExistingPopup();
+                showSuccessPopup("ส่งรหัส OTP สำเร็จ", "กรุณาตรวจสอบอีเมลของคุณ", () => {
+                    const registrationData = encodeURIComponent(JSON.stringify({
+                        username: form.username,
+                        name: form.firstname,
+                        surname: form.lastname,
+                        sex: form.sex,
+                        birthday: form.birthday,
+                        email: form.email,
+                        password: form.password,
+                        tel: form.tel
+                    }));
+                    router.push(`/otp?type=register&data=${registrationData}`);
+                });
+            } else {
+                removeExistingPopup();
+                showErrorPopup("ส่งรหัส OTP ล้มเหลว", otpRes.data.message || "ไม่สามารถส่งอีเมลได้");
+            }
+        } catch (err) {
+            console.error("OTP error", err);
+            removeExistingPopup();
+            showErrorPopup("เกิดข้อผิดพลาด", "ไม่สามารถส่งรหัส OTP ได้");
+        }
+    };
+
     return (
         <main>
             <div className="login_container_top">
@@ -140,8 +158,14 @@ export default function Register() {
             </div>
             <div className="login_container_outer">
                 <div className="login_container_inner">
-                    <img src="./picintro.png" alt="Introduction" />
-                    <div className="login_container_inner_right" style={{ justifyContent:"space-between" ,flex:1 }}>
+                    <Image 
+                        src="/picintro.png" 
+                        alt="Introduction" 
+                        width={400}
+                        height={400}
+                        priority
+                    />
+                    <div className="login_container_inner_right" style={{ justifyContent: "space-between", flex: 1 }}>
                         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                             <input
                                 name="username"
@@ -178,14 +202,14 @@ export default function Register() {
                                     className="input_button dropdown_only"
                                     value={form.sex}
                                     onChange={handleChange}
-                                    id ="dropdown"
+                                    id="dropdown"
                                 >
                                     <option value="" disabled hidden>เพศ</option>
-                                    <option value="female" >หญิง</option>
+                                    <option value="female">หญิง</option>
                                     <option value="male">ชาย</option>
                                     <option value="other">ไม่ระบุ</option>
                                 </select>
-                                <div className="datepicker_container" style={{ }}>
+                                <div className="datepicker_container">
                                     <ReactDatePicker
                                         selected={birthday}
                                         onChange={(date) => {
@@ -194,7 +218,7 @@ export default function Register() {
                                         }}
                                         dateFormat="dd / MM / yyyy"
                                         placeholderText="วัน / เดือน / ปี เกิด"
-                                        className="input_button "
+                                        className="input_button"
                                         maxDate={new Date()}
                                         showMonthDropdown
                                         showYearDropdown
@@ -202,7 +226,7 @@ export default function Register() {
                                     />
                                 </div>
                             </div>
-                            
+
                             <input
                                 name="email"
                                 type="email"
@@ -222,11 +246,10 @@ export default function Register() {
                                 style={{ width: "100%" }}
                             />
 
-
                             <div style={{ position: "relative" }}>
                                 <input
                                     name="password"
-                                    type={showPassword ? "text" : "password"}
+                                    type="password"
                                     placeholder="รหัสผ่าน"
                                     className="input_button"
                                     value={form.password}
@@ -237,7 +260,7 @@ export default function Register() {
                             <div style={{ position: "relative" }}>
                                 <input
                                     name="confirmPassword"
-                                    type={showConfirmPassword ? "text" : "password"}
+                                    type="password"
                                     placeholder="ยืนยันรหัสผ่าน"
                                     className="input_button"
                                     value={form.confirmPassword}
@@ -245,8 +268,8 @@ export default function Register() {
                                     style={{ width: "100%" }}
                                 />
                             </div>
-                            <div style={{ display: "flex", justifyContent: "center"}}>
-                                <button type="submit" className="first_button_getstart" style={{ marginTop: 12}}>
+                            <div style={{ display: "flex", justifyContent: "center" }}>
+                                <button type="submit" className="first_button_getstart" style={{ marginTop: 12 }}>
                                     <h1 className="font_description_white normal">รับรหัส OTP</h1>
                                 </button>
                             </div>

@@ -1,12 +1,24 @@
 "use client";
 import "./ranking.css";
 import { FaUser } from "react-icons/fa";
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "../axios";
 import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import { showConfirmPopup, removeExistingPopup } from "../components/Popup";
+
+interface JwtPayload {
+  id: string;
+}
+
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+    };
+  };
+}
 
 interface UserRank {
   id: number;
@@ -20,7 +32,7 @@ export default function Ranking() {
   const [currentUser, setCurrentUser] = useState<UserRank | null>(null);
   const router = useRouter();
 
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
 
@@ -36,13 +48,10 @@ export default function Ranking() {
         return;
       }
 
-      // ตั้ง header ให้ axios ส่ง token
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      // decode token (ตรวจสอบรูปแบบก่อนใช้งาน)
-      let decoded: any;
       try {
-        decoded = jwtDecode(token);
+        const decoded = jwtDecode<JwtPayload>(token);
         console.log("User ID from token:", decoded.id);
       } catch (e) {
         console.warn("Invalid token format:", e);
@@ -58,18 +67,17 @@ export default function Ranking() {
         return;
       }
 
-      // ตรวจสอบว่า endpoint /getdata ตอบกลับสำเร็จ
       const userRes = await axios.get("/getdata");
       if (!userRes.data?.success) {
         throw new Error("Failed to fetch user data");
       }
 
-      // ถ้าต้องการใช้ข้อมูลผู้ใช้ สามารถนำไปใช้ที่นี่
       console.log("User data fetched:", userRes.data.user);
 
-    } catch (err: any) {
-      console.error("Error fetching user data:", err);
-      if (err.response?.status === 401) {
+    } catch (err) {
+      const error = err as ApiError;
+      console.error("Error fetching user data:", error);
+      if (error.response?.status === 401) {
         localStorage.removeItem("token");
         removeExistingPopup();
         showConfirmPopup(
@@ -79,42 +87,38 @@ export default function Ranking() {
             router.push("/");
           }
         );
-      } else if (err.response?.status === 403) {
-        // 403 Forbidden - ไม่แจ้งเตือนและไม่ redirect
+      } else if (error.response?.status === 403) {
         console.warn("Access forbidden (403) - No redirect");
       } else {
         removeExistingPopup();
         showConfirmPopup(
           "ไม่สามารถดึงข้อมูลผู้ใช้ได้",
           "กรุณาลองใหม่อีกครั้ง",
-          () => {
-
-          }
+          () => {}
         );
       }
     }
-  };
+  }, [router]);
 
-  useEffect(() => {
-    // เรียกเช็คผู้ใช้เมื่อเข้าหน้านี้ (mount)
-    fetchUserData();
-  }, []);
-
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const res = await axios.get("/leaderboard");
-        if (res.data.success) {
-          setLeaderboard(res.data.leaderboard);
-          setCurrentUser(res.data.current_user);
-        }
-      } catch (err) {
-        console.error("Error loading leaderboard:", err);
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const res = await axios.get("/leaderboard");
+      if (res.data.success) {
+        setLeaderboard(res.data.leaderboard);
+        setCurrentUser(res.data.current_user);
       }
-    };
-
-    fetchLeaderboard();
+    } catch (err) {
+      console.error("Error loading leaderboard:", err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   const top3 = leaderboard.slice(0, 3);
   const others = leaderboard.slice(3);

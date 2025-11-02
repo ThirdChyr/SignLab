@@ -1,14 +1,34 @@
 "use client";
 import "./vocabulary.css";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "../axios";
 import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
-import { useEffect } from "react";
-import { showLoadingPopup, showSuccessPopup, showErrorPopup, showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import { showConfirmPopup, removeExistingPopup } from "../components/Popup";
+import Image from 'next/image';
+
+interface JwtPayload {
+  id: string;
+}
+
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+    };
+  };
+}
+
+interface VocabItem {
+  id: number;
+  question: string;
+  video?: string;
+  image?: string;
+}
 
 // Stage 1: ทักทาย (video)
-const greetData = [
+const greetData: VocabItem[] = [
   { id: 1, question:"ฉัน", video: "/chapter/stage1/01.mp4" },
   { id: 2, question: "ขอโทษ", video: "/chapter/stage1/02.mp4" },
   { id: 3, question: "ขอบคุณ", video: "/chapter/stage1/03.mp4" },
@@ -25,7 +45,7 @@ const greetData = [
 ];
 
 // Stage 2: ตัวเลข (image)
-const numberData = [
+const numberData: VocabItem[] = [
   { id: 1, question: "1", image: "/chapter/stage2/1.png" },
   { id: 2, question: "2", image: "/chapter/stage2/2.png" },
   { id: 3, question: "3", image: "/chapter/stage2/3.png" },
@@ -63,7 +83,7 @@ const numberData = [
 ];
 
 // Stage 5: วันและเวลา (video)
-const timeData = [
+const timeData: VocabItem[] = [
   { id: 1, question: "วัน", video: "/chapter/stage5/01.mp4" },
   { id: 2, question: "สัปดาห์", video: "/chapter/stage5/02.mp4" },
   { id: 3, question: "เดือน", video: "/chapter/stage5/03.mp4" },
@@ -98,11 +118,10 @@ const timeData = [
 
 export default function Vocabulary() {
   const [popupOpen, setPopupOpen] = useState(false);
-  const [popupData, setPopupData] = useState<any>(null);
-
+  const [popupData, setPopupData] = useState<VocabItem | null>(null);
   const router = useRouter();
 
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
 
@@ -118,13 +137,10 @@ export default function Vocabulary() {
         return;
       }
 
-      // ตั้ง header ให้ axios ส่ง token
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      // decode token (ตรวจสอบรูปแบบก่อนใช้งาน)
-      let decoded: any;
       try {
-        decoded = jwtDecode(token);
+        const decoded = jwtDecode<JwtPayload>(token);
         console.log("User ID from token:", decoded.id);
       } catch (e) {
         console.warn("Invalid token format:", e);
@@ -140,18 +156,17 @@ export default function Vocabulary() {
         return;
       }
 
-      // ตรวจสอบว่า endpoint /getdata ตอบกลับสำเร็จ
       const userRes = await axios.get("/getdata");
       if (!userRes.data?.success) {
         throw new Error("Failed to fetch user data");
       }
 
-      // ถ้าต้องการใช้ข้อมูลผู้ใช้ สามารถนำไปใช้ที่นี่
       console.log("User data fetched:", userRes.data.user);
 
-    } catch (err: any) {
-      console.error("Error fetching user data:", err);
-      if (err.response?.status === 401) {
+    } catch (err) {
+      const error = err as ApiError;
+      console.error("Error fetching user data:", error);
+      if (error.response?.status === 401) {
         localStorage.removeItem("token");
         removeExistingPopup();
         showConfirmPopup(
@@ -161,37 +176,33 @@ export default function Vocabulary() {
             router.push("/");
           }
         );
-      } else if (err.response?.status === 403) {
-        // 403 Forbidden - ไม่แจ้งเตือนและไม่ redirect
+      } else if (error.response?.status === 403) {
         console.warn("Access forbidden (403) - No redirect");
       } else {
         removeExistingPopup();
         showConfirmPopup(
           "ไม่สามารถดึงข้อมูลผู้ใช้ได้",
           "กรุณาลองใหม่อีกครั้ง",
-          () => {
-
-          }
+          () => {}
         );
       }
     }
-  };
+  }, [router]);
 
   useEffect(() => {
-    // เรียกเช็คผู้ใช้เมื่อเข้าหน้านี้ (mount)
     fetchUserData();
-  }, []);
+  }, [fetchUserData]);
 
-
-  const handlePopup = (data: any) => {
+  const handlePopup = useCallback((data: VocabItem) => {
     setPopupData(data);
     setPopupOpen(true);
-  };
+  }, []);
 
-  const closePopup = () => setPopupOpen(false);
+  const closePopup = useCallback(() => {
+    setPopupOpen(false);
+  }, []);
 
-  // เลือก media ที่จะแสดงใน popup
-  const renderPopupMedia = () => {
+  const renderPopupMedia = useCallback(() => {
     if (!popupData) return null;
     if (popupData.video) {
       return (
@@ -209,12 +220,18 @@ export default function Vocabulary() {
     if (popupData.image) {
       return (
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-          <img src={popupData.image} alt={popupData.question} width={320} style={{ borderRadius: 12 }} />
+          <Image 
+            src={popupData.image} 
+            alt={popupData.question} 
+            width={320} 
+            height={320}
+            style={{ borderRadius: 12 }} 
+          />
         </div>
       );
     }
     return null;
-  };
+  }, [popupData]);
 
   return (
     <div className="vocab-bg">
